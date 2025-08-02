@@ -1,0 +1,481 @@
+---
+title: 'CLI Commands'
+description: 'Command-line interface and environment variables for Chisel CLI'
+---
+
+The `chisel` command is the primary interface for running Python scripts on cloud GPUs. It activates GPU functionality and handles authentication, upload, and execution automatically.
+
+## chisel Command
+
+The main command for executing Python scripts on cloud GPUs.
+
+```bash
+chisel <command> [arguments...]
+```
+
+### How It Works
+
+<Steps>
+<Step title="Environment Setup">
+Sets `CHISEL_ACTIVATED=1` environment variable to enable GPU functionality in ChiselApp instances.
+</Step>
+
+<Step title="Authentication Check">
+Verifies user authentication or initiates browser-based authentication flow if needed.
+</Step>
+
+<Step title="Command Execution">
+Executes the specified command with GPU functionality enabled and real-time output streaming.
+</Step>
+</Steps>
+
+### Basic Usage
+
+<Tabs>
+<Tab title="Python Scripts">
+```bash
+# Execute any Python script on GPU
+chisel python my_script.py
+
+# Script with command-line arguments
+chisel python my_script.py --arg1 value1 --arg2 value2
+
+# Python with complex arguments
+chisel python my_script.py --config config.json --verbose
+```
+</Tab>
+
+<Tab title="Python Modules">
+```bash
+# Run Python modules
+chisel python -m pytest tests/
+chisel python -m pip install numpy
+chisel python -m jupyter notebook
+
+# Run with module arguments
+chisel python -m pytest tests/ -v --tb=short
+```
+</Tab>
+
+<Tab title="Interactive Commands">
+```bash
+# One-liner Python execution
+chisel python -c "import torch; print(torch.cuda.is_available())"
+
+# Interactive Python shell (limited functionality)
+chisel python -i
+
+# IPython or Jupyter
+chisel ipython
+chisel jupyter notebook
+```
+</Tab>
+
+<Tab title="Advanced Usage">
+```bash
+# Complex command with quotes
+chisel python my_script.py --text "hello world" --data '[1,2,3]'
+
+# Using environment variables
+ENV_VAR=value chisel python my_script.py
+
+# Redirect output
+chisel python my_script.py > output.log 2>&1
+```
+</Tab>
+</Tabs>
+
+## Environment Variables
+
+Environment variables that control Chisel CLI behavior:
+
+### Core Variables
+
+<ParamField path="CHISEL_ACTIVATED" type="string">
+Set to "1" by the `chisel` command to activate GPU functionality. When set, ChiselApp instances will run in active mode.
+</ParamField>
+
+<ParamField path="CHISEL_BACKEND_URL" type="string">
+Override the default backend URL. Useful for testing or connecting to different environments.
+</ParamField>
+
+<ParamField path="CHISEL_API_KEY" type="string">
+Directly provide API key for authentication, bypassing stored credentials.
+</ParamField>
+
+### Backend Variables
+
+These are set automatically by the backend system:
+
+<ParamField path="CHISEL_BACKEND_RUN" type="string">
+Set to "1" when code is executing on the backend. Indicates cloud GPU execution environment.
+</ParamField>
+
+<ParamField path="CHISEL_JOB_ID" type="string">
+Unique identifier for the current job. Available during backend execution for tracking and logging.
+</ParamField>
+
+### Environment Variable Examples
+
+<CodeGroup>
+```bash Custom Backend
+# Use production backend
+export CHISEL_BACKEND_URL="https://api.herdora.com"
+chisel python my_script.py
+```
+
+```bash Direct API Key
+# Bypass stored credentials
+export CHISEL_API_KEY="your_api_key_here"
+chisel python my_script.py
+```
+
+```bash Development Setup
+# Local development with custom settings
+export CHISEL_BACKEND_URL="http://localhost:8000"
+export CHISEL_DEBUG="1"
+chisel python my_script.py
+```
+
+```python Script Environment Check
+import os
+
+def get_execution_environment():
+    """Determine where the script is running."""
+    if os.environ.get("CHISEL_BACKEND_RUN") == "1":
+        job_id = os.environ.get("CHISEL_JOB_ID", "unknown")
+        return f"cloud_gpu (job: {job_id})"
+    elif os.environ.get("CHISEL_ACTIVATED") == "1":
+        return "chisel_mode"
+    else:
+        return "local_cpu"
+
+print(f"Running in: {get_execution_environment()}")
+```
+</CodeGroup>
+
+## Real-time Output
+
+The `chisel` command provides real-time streaming of execution output:
+
+### Output Features
+
+<AccordionGroup>
+<Accordion title="Live Upload Progress" icon="upload">
+- Visual progress indicator during code upload
+- Upload speed and time estimates
+- File count and size information
+
+```bash
+chisel python my_script.py
+# 📤 Uploading code... ████████████████████████████████ 100% (2.5MB/2.5MB)
+# ⏱️  Upload complete in 3.2s
+```
+</Accordion>
+
+<Accordion title="Job Information" icon="info">
+- Instant job ID and tracking URL
+- GPU allocation details
+- Estimated start time
+
+```bash
+# 🚀 Job submitted successfully!
+# 📋 Job ID: job_abc123def456
+# 🔗 Monitor at: https://dashboard.herdora.com/jobs/job_abc123def456
+# 🎯 Allocated: 2x A100-80GB GPUs
+```
+</Accordion>
+
+<Accordion title="Real-time Streaming" icon="stream">
+- Live stdout/stderr output from your script
+- Preserves formatting and colors
+- Real-time error reporting
+
+```bash
+# 🔄 Starting execution...
+# Your script output appears here in real-time
+# Error messages are shown immediately
+```
+</Accordion>
+
+<Accordion title="Completion Summary" icon="check">
+- Execution time and performance metrics
+- Cost information and resource usage
+- Exit code and status
+
+```bash
+# ✅ Execution completed successfully!
+# ⏱️  Total time: 45.3s (execution: 42.1s, overhead: 3.2s)
+# 💰 Cost: $0.15
+# 📊 GPU utilization: 87%
+```
+</Accordion>
+</AccordionGroup>
+
+## Command Examples
+
+### Argument Passing
+
+<CodeGroup>
+```bash Simple Arguments
+# Basic argument passing
+chisel python train.py --epochs 100 --lr 0.001
+
+# Boolean flags
+chisel python train.py --verbose --save-model
+
+# Mixed argument types
+chisel python process.py --input data.csv --output results/ --batch-size 32
+```
+
+```bash Complex Arguments
+# Arguments with spaces (use quotes)
+chisel python analyze.py --message "Hello World" --path "/path/with spaces/"
+
+# JSON arguments
+chisel python config.py --params '{"lr": 0.001, "epochs": 50}'
+
+# List arguments
+chisel python process.py --files file1.txt file2.txt file3.txt
+```
+
+```bash Environment + Arguments
+# Combine environment variables with arguments
+GPU_MEMORY_LIMIT=75 chisel python train.py --model large --batch-size 16
+
+# Multiple environment variables
+CUDA_VISIBLE_DEVICES=0,1 TORCH_BACKENDS_CUDA_ENABLE_FLASH=1 chisel python train.py
+```
+</CodeGroup>
+
+### Testing and Development
+
+<CodeGroup>
+```bash Quick Testing
+# Test CUDA availability
+chisel python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+# Test specific functionality
+chisel python -c "
+import torch
+print(f'GPU count: {torch.cuda.device_count()}')
+print(f'GPU name: {torch.cuda.get_device_name(0)}')
+print(f'Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB')
+"
+```
+
+```bash Development Workflow
+# Run tests on GPU
+chisel python -m pytest tests/ -v
+
+# Install packages on GPU environment
+chisel python -m pip install transformers accelerate
+
+# Interactive development
+chisel python -i my_script.py  # Start interactive after running script
+```
+
+```bash Debugging
+# Run with Python debugger
+chisel python -m pdb my_script.py
+
+# Verbose output for debugging
+CHISEL_DEBUG=1 chisel python my_script.py
+
+# Profile execution
+chisel python -m cProfile -o profile.out my_script.py
+```
+</CodeGroup>
+
+## Error Handling
+
+The `chisel` command includes comprehensive error handling:
+
+### Common Exit Codes
+
+| Exit Code | Meaning | Example |
+| --- | --- | --- |
+| 0 | Success | Script completed without errors |
+| 1 | Script error | Python script raised an exception |
+| 2 | Authentication error | Failed to authenticate with backend |
+| 3 | Upload error | Failed to upload code to backend |
+| 4 | Connection error | Network or backend connectivity issues |
+
+### Error Examples
+
+<CodeGroup>
+```bash Authentication Error
+chisel python my_script.py
+# ❌ Authentication failed. Unable to get valid API key.
+# 💡 Try: clear credentials and re-authenticate
+# Exit code: 2
+```
+
+```bash Upload Error
+chisel python my_script.py
+# ❌ Work upload failed: File too large (>100MB)
+# 💡 Try: reduce upload directory size or use .gitignore
+# Exit code: 3
+```
+
+```bash Script Error
+chisel python my_script.py
+# ❌ Script execution failed:
+# Traceback (most recent call last):
+#   File "my_script.py", line 10, in <module>
+#     result = undefined_function()
+# NameError: name 'undefined_function' is not defined
+# Exit code: 1
+```
+</CodeGroup>
+
+## Integration Patterns
+
+### Shell Scripting
+
+```bash
+#!/bin/bash
+# Example: Automated training pipeline
+
+echo "🚀 Starting training pipeline..."
+
+# Check authentication
+if ! chisel python -c "from chisel.auth import is_authenticated; exit(0 if is_authenticated() else 1)"; then
+    echo "❌ Authentication required"
+    exit 1
+fi
+
+# Run preprocessing
+echo "📊 Preprocessing data..."
+chisel python preprocess.py --input raw_data/ --output processed/
+
+# Run training
+echo "🎯 Training model..."
+chisel python train.py --data processed/ --output models/
+
+# Run evaluation
+echo "📈 Evaluating model..."
+chisel python evaluate.py --model models/latest.pt --test-data test/
+
+echo "✅ Pipeline complete!"
+```
+
+### Makefile Integration
+
+```makefile
+# Makefile for ML project with Chisel
+
+.PHONY: install train evaluate test
+
+install:
+	chisel python -m pip install -r requirements.txt
+
+train:
+	chisel python train.py --config config/train.yaml
+
+evaluate:
+	chisel python evaluate.py --model-dir models/ --data-dir test/
+
+test:
+	chisel python -m pytest tests/ -v
+
+clean:
+	rm -rf models/ logs/ __pycache__/
+
+pipeline: install train evaluate
+	@echo "✅ Full pipeline completed"
+```
+
+### CI/CD Integration
+
+```yaml
+# GitHub Actions example
+name: GPU Training Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  gpu-training:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    
+    - name: Install Chisel CLI
+      run: pip install chisel-cli
+    
+    - name: Authenticate
+      env:
+        CHISEL_API_KEY: ${{ secrets.CHISEL_API_KEY }}
+      run: echo "Using API key from secrets"
+    
+    - name: Run GPU training
+      env:
+        CHISEL_API_KEY: ${{ secrets.CHISEL_API_KEY }}
+      run: chisel python train.py --config config/ci.yaml
+```
+
+## Performance Considerations
+
+<Tip>
+Optimize your `chisel` usage for better performance and cost efficiency.
+</Tip>
+
+### Upload Optimization
+
+```bash
+# Reduce upload size with .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore
+echo ".venv/" >> .gitignore
+echo "data/" >> .gitignore  # Don't upload large datasets
+
+# Use specific upload directory
+chisel python src/train.py  # Only uploads current directory
+```
+
+### Batch Operations
+
+```bash
+# Combine multiple operations in one session
+chisel python -c "
+import subprocess
+import sys
+
+# Install dependencies
+subprocess.run([sys.executable, '-m', 'pip', 'install', 'torch', 'transformers'])
+
+# Run preprocessing
+subprocess.run([sys.executable, 'preprocess.py'])
+
+# Run training
+subprocess.run([sys.executable, 'train.py'])
+
+# Run evaluation
+subprocess.run([sys.executable, 'evaluate.py'])
+"
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="ChiselApp" icon="rocket" href="/api-reference/chisel-app">
+    Python API that works with CLI commands
+  </Card>
+  
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    Authentication functions and credential management
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Environment variables and configuration options
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    CLI troubleshooting and common issues
+  </Card>
+</CardGroup> 

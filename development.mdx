@@ -1,94 +1,1095 @@
 ---
-title: 'Development'
-description: 'Preview changes locally to update your docs'
+title: "Development Guide"
+description: "Contributing to and developing Chisel CLI with setup instructions, code standards, and testing procedures"
 ---
 
-<Info>
-  **Prerequisites**:
-  - Node.js version 19 or higher
-  - A docs repository with a `docs.json` file
-</Info>
+Comprehensive guide for contributing to Chisel CLI development, from setup to submitting contributions.
 
-Follow these steps to install and run Mintlify on your operating system.
+## Quick Start for Contributors
 
 <Steps>
-<Step title="Install the Mintlify CLI">
+<Step title="Fork and Clone">
+Fork the repository and clone it locally:
 
 ```bash
-npm i -g mint
+git clone https://github.com/YOUR_USERNAME/chisel.git
+cd chisel
 ```
 </Step>
 
-<Step title="Preview locally">
-
-Navigate to your docs directory where your `docs.json` file is located, and run the following command:
+<Step title="Setup Environment">
+Create and activate a virtual environment:
 
 ```bash
-mint dev
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# OR .venv\Scripts\activate  # Windows
 ```
+</Step>
 
-A local preview of your documentation will be available at `http://localhost:3000`.
+<Step title="Install in Development Mode">
+Install Chisel CLI in development mode with all dependencies:
 
+```bash
+pip install -e .[dev]
+```
+</Step>
+
+<Step title="Verify Setup">
+Run tests to ensure everything works:
+
+```bash
+ruff check src/ examples/
+pytest tests/
+```
 </Step>
 </Steps>
 
-## Custom ports
+## Development Setup
 
-By default, Mintlify uses port 3000. You can customize the port Mintlify runs on by using the `--port` flag. For example, to run Mintlify on port 3333, use this command:
-
-```bash
-mint dev --port 3333
-```
-
-If you attempt to run Mintlify on a port that's already in use, it will use the next available port:
-
-```md
-Port 3000 is already in use. Trying 3001 instead.
-```
-
-## Mintlify versions
-
-Please note that each CLI release is associated with a specific version of Mintlify. If your local preview does not align with the production version, please update the CLI:
-
-```bash
-npm mint update
-```
-
-## Validating links
-
-The CLI can assist with validating links in your documentation. To identify any broken links, use the following command:
-
-```bash
-mint broken-links
-```
-
-## Deployment
-
-If the deployment is successful, you should see the following:
-
-<Frame>
-  <img src="/images/checks-passed.png" alt="Screenshot of a deployment confirmation message that says All checks have passed." style={{ borderRadius: '0.5rem' }} />
-</Frame>
-
-## Code formatting
-
-We suggest using extensions on your IDE to recognize and format MDX. If you're a VSCode user, consider the [MDX VSCode extension](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) for syntax highlighting, and [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting.
-
-## Troubleshooting
+### Prerequisites
 
 <AccordionGroup>
-  <Accordion title='Error: Could not load the "sharp" module using the darwin-arm64 runtime'>
+<Accordion title="System Requirements" icon="desktop">
+- **Python**: 3.8 or higher
+- **Git**: For version control
+- **Virtual Environment**: Recommended for isolation
+- **Code Editor**: VS Code, PyCharm, or similar with Python support
 
-    This may be due to an outdated version of node. Try the following:
-    1. Remove the currently-installed version of the CLI: `npm remove -g mint`
-    2. Upgrade to Node v19 or higher.
-    3. Reinstall the CLI: `npm i -g mint`
-  </Accordion>
+**Verify Prerequisites:**
+```bash
+python --version  # Should be 3.8+
+git --version     # Any recent version
+pip --version     # Should be recent
+```
+</Accordion>
 
-  <Accordion title="Issue: Encountering an unknown error">
-  
-    Solution: Go to the root of your device and delete the `~/.mintlify` folder. Then run `mint dev` again.
-  </Accordion>
+<Accordion title="Development Dependencies" icon="package">
+The development setup includes additional tools for code quality and testing:
+
+```bash
+# Included in [dev] extra dependencies:
+# - ruff: Linting and formatting
+# - pytest: Testing framework  
+# - black: Code formatting (backup)
+# - mypy: Type checking
+# - pre-commit: Git hooks
+
+# Install all development dependencies
+pip install -e .[dev]
+
+# Or install manually
+pip install ruff pytest black mypy pre-commit
+```
+</Accordion>
 </AccordionGroup>
 
-Curious about what changed in the latest CLI version? Check out the [CLI changelog](https://www.npmjs.com/package/mintlify?activeTab=versions).
+### Project Structure
+
+Understanding the codebase organization:
+
+<Tabs>
+<Tab title="Core Structure">
+```
+chisel/
+├── src/chisel/               # Main package
+│   ├── __init__.py          # CLI entry point and exports
+│   ├── core.py              # ChiselApp functionality
+│   ├── auth.py              # Authentication system
+│   ├── spinner.py           # UI utilities and progress
+│   └── constants.py         # GPU types and configuration
+├── examples/                # Usage examples
+├── tests/                   # Test suite
+├── docs/                    # Documentation
+├── pyproject.toml          # Package configuration
+└── README.md               # Main project README
+```
+</Tab>
+
+<Tab title="Source Code Details">
+```
+src/chisel/
+├── __init__.py              # Exports: ChiselApp, GPUType
+├── core.py                  # Main classes:
+│                           #   - ChiselApp
+│                           #   - Trace capture functionality
+├── auth.py                  # Authentication:
+│                           #   - Browser-based auth flow
+│                           #   - Credential storage
+│                           #   - API key management
+├── spinner.py               # UI components:
+│                           #   - Progress indicators
+│                           #   - Status messages
+└── constants.py             # Configuration:
+                            #   - Environment variables
+                            #   - GPUType enum
+                            #   - Default values
+```
+</Tab>
+
+<Tab title="Testing Structure">
+```
+tests/
+├── test_core.py             # ChiselApp functionality
+├── test_auth.py             # Authentication tests
+├── test_cli.py              # CLI functionality
+├── test_gpu_types.py        # GPU type validation
+├── conftest.py              # Pytest configuration
+└── fixtures/                # Test data and helpers
+```
+</Tab>
+</Tabs>
+
+## Code Standards
+
+### Linting and Formatting
+
+We use **Ruff** for both linting and formatting to ensure consistent code quality:
+
+<CodeGroup>
+```bash Check Code Style
+# Check for style and quality issues
+ruff check src/ examples/ tests/
+
+# Auto-fix issues where possible
+ruff check src/ examples/ tests/ --fix
+
+# Format code
+ruff format src/ examples/ tests/
+
+# Check if formatting is needed
+ruff format src/ examples/ tests/ --check
+```
+
+```bash Run All Quality Checks
+# Complete quality check script
+#!/bin/bash
+echo "🔍 Running code quality checks..."
+
+echo "📏 Checking code style..."
+ruff check src/ examples/ tests/
+
+echo "✨ Checking formatting..."  
+ruff format src/ examples/ tests/ --check
+
+echo "🧪 Running tests..."
+pytest tests/
+
+echo "✅ All checks passed!"
+```
+
+```toml Ruff Configuration
+# pyproject.toml configuration
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+```
+</CodeGroup>
+
+### Code Style Guidelines
+
+<AccordionGroup>
+<Accordion title="Python Style Standards" icon="code">
+**Line Length**: 100 characters maximum
+**Quote Style**: Double quotes for strings
+**Indentation**: 4 spaces (no tabs)
+**Import Order**: Standard library, third-party, local imports
+
+```python
+# Good example
+from typing import Optional
+import os
+
+import torch
+import requests
+
+from chisel.constants import GPUType
+from chisel.auth import authenticate
+
+
+class ChiselApp:
+    """Main application class for GPU acceleration."""
+    
+    def __init__(self, name: str, gpu: Optional[GPUType] = None):
+        self.name = name
+        self.gpu = gpu
+        
+    def capture_trace(self, trace_name: str = "default"):
+        """Decorator for capturing execution traces."""
+        def decorator(func):
+            return func
+        return decorator
+```
+</Accordion>
+
+<Accordion title="Documentation Standards" icon="book">
+**Docstrings**: Use Google-style docstrings for all public functions and classes
+**Type Hints**: Include type hints for all function parameters and return values
+**Comments**: Explain complex logic and business decisions
+
+```python
+def authenticate(backend_url: str = "http://localhost:8000") -> str:
+    """Authenticate with the Chisel backend.
+    
+    Opens a browser window for user authentication and stores
+    the resulting API key securely.
+    
+    Args:
+        backend_url: The backend URL to authenticate against.
+        
+    Returns:
+        The API key string on successful authentication.
+        
+    Raises:
+        RuntimeError: If authentication fails or is cancelled.
+        
+    Example:
+        >>> api_key = authenticate("https://api.herdora.com")
+        >>> print(f"Authenticated with key: {api_key[:8]}...")
+    """
+    # Implementation here
+    pass
+```
+</Accordion>
+
+<Accordion title="Error Handling Standards" icon="exclamation-triangle">
+**Exception Types**: Use appropriate built-in exceptions or create custom ones
+**Error Messages**: Clear, actionable error messages with context
+**Logging**: Use logging module for debugging information
+
+```python
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+class ChiselAuthenticationError(RuntimeError):
+    """Raised when authentication with Chisel backend fails."""
+    pass
+
+
+def load_credentials() -> Optional[dict]:
+    """Load stored credentials from file.
+    
+    Returns:
+        Credentials dictionary or None if not found/invalid.
+        
+    Raises:
+        ChiselAuthenticationError: If credentials are corrupted.
+    """
+    try:
+        with open(credentials_path) as f:
+            credentials = json.load(f)
+            
+        if not validate_credentials(credentials):
+            raise ChiselAuthenticationError(
+                "Stored credentials are invalid. Please re-authenticate."
+            )
+            
+        return credentials
+        
+    except FileNotFoundError:
+        logger.debug("No credentials file found")
+        return None
+        
+    except json.JSONDecodeError as e:
+        raise ChiselAuthenticationError(
+            f"Credentials file is corrupted: {e}. Please re-authenticate."
+        ) from e
+```
+</Accordion>
+</AccordionGroup>
+
+### Pre-commit Hooks
+
+Set up automated quality checks before each commit:
+
+<Steps>
+<Step title="Install pre-commit">
+```bash
+pip install pre-commit
+```
+</Step>
+
+<Step title="Create configuration">
+Create `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.1.9
+  hooks:
+    - id: ruff
+      args: [--fix]
+    - id: ruff-format
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.4.0
+  hooks:
+    - id: trailing-whitespace
+    - id: end-of-file-fixer
+    - id: check-yaml
+    - id: check-toml
+```
+</Step>
+
+<Step title="Install hooks">
+```bash
+pre-commit install
+```
+
+<Check>
+Now quality checks run automatically before each commit!
+</Check>
+</Step>
+</Steps>
+
+## Testing
+
+### Running Tests
+
+<Tabs>
+<Tab title="Basic Testing">
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_core.py
+
+# Run specific test
+pytest tests/test_core.py::test_app_creation
+```
+</Tab>
+
+<Tab title="Coverage Testing">
+```bash
+# Install coverage
+pip install pytest-cov
+
+# Run tests with coverage
+pytest --cov=chisel --cov-report=html
+
+# View coverage report
+open htmlcov/index.html  # macOS
+xdg-open htmlcov/index.html  # Linux
+```
+</Tab>
+
+<Tab title="Integration Testing">
+```bash
+# Run integration tests (requires authentication)
+pytest tests/test_integration.py -m integration
+
+# Skip slow tests during development
+pytest -m "not slow"
+
+# Run only unit tests
+pytest -m "not integration and not slow"
+```
+</Tab>
+</Tabs>
+
+### Writing Tests
+
+<AccordionGroup>
+<Accordion title="Test Structure and Patterns" icon="flask">
+Follow these patterns for consistent, maintainable tests:
+
+```python
+import pytest
+import os
+from unittest.mock import patch, MagicMock
+
+from chisel import ChiselApp, GPUType
+from chisel.auth import authenticate, clear_credentials
+
+
+class TestChiselApp:
+    """Test suite for ChiselApp functionality."""
+    
+    def test_app_creation_with_gpu_type(self):
+        """Test ChiselApp creation with GPU type."""
+        app = ChiselApp("test-app", gpu=GPUType.A100_80GB_2)
+        
+        assert app.name == "test-app"
+        assert app.gpu == "A100-80GB:2"
+        
+    def test_app_creation_defaults(self):
+        """Test ChiselApp creation with default values."""
+        app = ChiselApp("test-app")
+        
+        assert app.name == "test-app"
+        assert app.gpu is None
+        assert app.upload_dir == "."
+        
+    @patch.dict(os.environ, {'CHISEL_ACTIVATED': '1'})
+    def test_app_activation(self):
+        """Test ChiselApp activation with environment variable."""
+        app = ChiselApp("test-app")
+        
+        assert app.activated is True
+        
+    @patch('chisel.core.requests.post')
+    def test_job_submission(self, mock_post):
+        """Test job submission with mocked backend."""
+        mock_post.return_value.json.return_value = {
+            'job_id': 'test-123',
+            'status': 'success'
+        }
+        
+        app = ChiselApp("test-app", gpu=GPUType.A100_80GB_1)
+        
+        # Test functionality that submits jobs
+        # ...
+        
+        # Verify backend was called correctly
+        mock_post.assert_called_once()
+```
+</Accordion>
+
+<Accordion title="Mocking and Fixtures" icon="wrench">
+Use mocking to isolate tests and avoid external dependencies:
+
+```python
+import pytest
+from unittest.mock import patch, MagicMock, mock_open
+
+
+@pytest.fixture
+def mock_credentials_file():
+    """Fixture providing mock credentials file."""
+    credentials = {
+        "api_key": "test-api-key-123",
+        "backend_url": "http://localhost:8000",
+        "expires_at": "2024-12-31T23:59:59Z"
+    }
+    return json.dumps(credentials)
+
+
+@pytest.fixture
+def temp_credentials_dir(tmp_path):
+    """Fixture providing temporary credentials directory."""
+    creds_dir = tmp_path / ".chisel"
+    creds_dir.mkdir()
+    return creds_dir
+
+
+class TestAuthentication:
+    """Test authentication functionality."""
+    
+    def test_load_existing_credentials(self, mock_credentials_file):
+        """Test loading valid credentials from file."""
+        with patch('builtins.open', mock_open(read_data=mock_credentials_file)):
+            with patch('os.path.exists', return_value=True):
+                credentials = load_credentials()
+                
+        assert credentials['api_key'] == 'test-api-key-123'
+        
+    @patch('webbrowser.open')
+    @patch('requests.post')
+    def test_browser_authentication(self, mock_post, mock_browser):
+        """Test browser-based authentication flow."""
+        mock_post.return_value.json.return_value = {'api_key': 'new-key-456'}
+        
+        result = authenticate()
+        
+        mock_browser.assert_called_once()
+        assert result == 'new-key-456'
+```
+</Accordion>
+
+<Accordion title="Integration Tests" icon="puzzle">
+Test real functionality with external services (when safe):
+
+```python
+import pytest
+import os
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.getenv('CHISEL_INTEGRATION_TESTS'),
+    reason="Integration tests disabled"
+)
+class TestIntegration:
+    """Integration tests requiring real backend."""
+    
+    def test_full_authentication_flow(self):
+        """Test complete authentication with real backend."""
+        # Only run if explicitly enabled
+        if not os.getenv('CHISEL_TEST_API_KEY'):
+            pytest.skip("No test API key provided")
+            
+        # Test real authentication flow
+        # (but use test backend, not production)
+        pass
+        
+    @pytest.mark.slow
+    def test_gpu_job_execution(self):
+        """Test actual GPU job execution."""
+        # Only run if GPU testing is enabled
+        if not os.getenv('CHISEL_GPU_TESTS'):
+            pytest.skip("GPU tests disabled")
+            
+        # Test real GPU execution
+        # (expensive, so marked as slow)
+        pass
+```
+</Accordion>
+</AccordionGroup>
+
+## Architecture
+
+### Core Components
+
+<Tabs>
+<Tab title="ChiselApp (core.py)">
+**Purpose**: Main application class for GPU acceleration
+
+**Key Responsibilities**:
+- GPU configuration and validation
+- Code packaging and upload management
+- Job submission and tracking  
+- Function decoration and tracing
+
+**Key Methods**:
+```python
+class ChiselApp:
+    def __init__(self, name: str, upload_dir: str = ".", gpu: Optional[GPUType] = None)
+    def capture_trace(self, trace_name: str = None, **kwargs) -> Callable
+    def _submit_job(self, script_path: str, args: List[str]) -> str
+    def _package_code(self) -> bytes
+```
+</Tab>
+
+<Tab title="Authentication (auth.py)">
+**Purpose**: Secure authentication with Herdora backend
+
+**Key Responsibilities**:
+- Browser-based authentication flow
+- Secure credential storage and retrieval
+- API key management and validation
+- Automatic token refresh
+
+**Key Functions**:
+```python
+def authenticate(backend_url: str = "http://localhost:8000") -> str
+def is_authenticated() -> bool
+def clear_credentials() -> None
+def load_credentials() -> Optional[dict]
+def save_credentials(credentials: dict) -> None
+```
+</Tab>
+
+<Tab title="CLI Entry Point (__init__.py)">
+**Purpose**: Command-line interface implementation
+
+**Key Responsibilities**:
+- `chisel` command processing
+- Environment variable management
+- Command execution and argument passing
+- Real-time output streaming
+
+**Execution Flow**:
+```python
+def main() -> int:
+    # 1. Parse command line arguments
+    # 2. Set CHISEL_ACTIVATED=1
+    # 3. Handle authentication
+    # 4. Execute command with streaming
+    # 5. Return exit code
+```
+</Tab>
+</Tabs>
+
+### Execution Modes
+
+<AccordionGroup>
+<Accordion title="Local Mode (CHISEL_ACTIVATED != '1')" icon="desktop">
+**When**: Running without `chisel` command
+
+**Behavior**:
+- ChiselApp runs in inactive mode
+- Decorators are pass-through (no-op)
+- Code executes normally on local machine
+- No authentication or upload required
+
+```python
+# Local execution
+python my_script.py
+# → Decorators do nothing
+# → Runs on local CPU/GPU
+```
+</Accordion>
+
+<Accordion title="Chisel Mode (chisel command)" icon="cloud">
+**When**: Using `chisel` command
+
+**Behavior**:
+- Sets `CHISEL_ACTIVATED=1` environment variable
+- Activates GPU functionality in ChiselApp
+- Handles authentication automatically  
+- Uploads code and runs on cloud GPU
+
+```python
+# Cloud execution
+chisel python my_script.py
+# → Sets environment variable
+# → Uploads and runs on cloud
+```
+</Accordion>
+
+<Accordion title="Backend Mode (CHISEL_BACKEND_RUN=1)" icon="server">
+**When**: Code executing on backend infrastructure
+
+**Behavior**:
+- Detects execution on cloud environment
+- Skips authentication and upload steps
+- Executes functions with GPU tracing enabled
+- Streams output back to client
+
+```python
+# Backend execution (automatic)
+# → Code runs on cloud GPU
+# → Output streamed to client
+```
+</Accordion>
+</AccordionGroup>
+
+## Contributing Workflow
+
+### Making Changes
+
+<Steps>
+<Step title="Create Feature Branch">
+Create a new branch for your changes:
+
+```bash
+git checkout -b feature/add-new-gpu-type
+# OR
+git checkout -b fix/authentication-bug
+# OR  
+git checkout -b docs/improve-examples
+```
+</Step>
+
+<Step title="Make Your Changes">
+Implement your feature or fix:
+
+- Write code following the style guidelines
+- Add or update tests for your changes
+- Update documentation if needed
+- Ensure all quality checks pass
+
+```bash
+# Run quality checks frequently
+ruff check src/ --fix
+pytest tests/
+```
+</Step>
+
+<Step title="Test Changes">
+Run comprehensive tests:
+
+```bash
+# All quality checks
+ruff check src/ examples/ tests/
+ruff format src/ examples/ tests/ --check
+
+# All tests
+pytest tests/ -v
+
+# Test examples still work
+python examples/basic_usage.py
+```
+</Step>
+
+<Step title="Commit Changes">
+Write clear, descriptive commit messages:
+
+```bash
+git add .
+git commit -m "Add support for H100 GPU type
+
+- Add H100_80GB variants to GPUType enum
+- Update GPU selection logic in core.py  
+- Add tests for new GPU types
+- Update configuration documentation"
+```
+</Step>
+</Steps>
+
+### Commit Message Guidelines
+
+<AccordionGroup>
+<Accordion title="Good Commit Messages" icon="check">
+**Format**: Brief summary + detailed explanation
+
+```bash
+# Good examples
+git commit -m "Add support for custom GPU types
+
+- Extend GPUType enum with custom type support
+- Add validation for custom GPU configurations
+- Update documentation with custom GPU examples
+- Add tests for custom GPU functionality"
+
+git commit -m "Fix argument passing in CLI wrapper
+
+- Resolve issue where quoted arguments were split incorrectly
+- Add proper shell escaping for complex arguments
+- Add tests for various argument scenarios
+- Fixes #123"
+
+git commit -m "Improve error messages for authentication failures
+
+- Add specific error messages for different failure modes
+- Include troubleshooting hints in error output
+- Add logging for authentication debugging
+- Update troubleshooting documentation"
+```
+</Accordion>
+
+<Accordion title="Poor Commit Messages" icon="x">
+**Avoid**: Vague or uninformative messages
+
+```bash
+# Poor examples (don't do this)
+git commit -m "fix bug"
+git commit -m "updates"
+git commit -m "changes"
+git commit -m "wip"
+git commit -m "refactor"
+```
+</Accordion>
+</AccordionGroup>
+
+### Pull Request Process
+
+<Steps>
+<Step title="Push Your Branch">
+Push your feature branch to your fork:
+
+```bash
+git push origin feature/your-feature-name
+```
+</Step>
+
+<Step title="Create Pull Request">
+Create a PR with a clear description:
+
+**Title**: Brief, descriptive summary
+**Description**: Include:
+- What the PR does
+- Why it's needed  
+- How to test it
+- Any breaking changes
+- Related issues
+
+```markdown
+## Description
+Add support for H100 GPU types to expand hardware options.
+
+## Changes
+- Added H100_80GB_1, H100_80GB_2, H100_80GB_4, H100_80GB_8 to GPUType enum
+- Updated GPU memory calculations for H100 architecture
+- Added validation tests for new GPU types
+- Updated configuration documentation
+
+## Testing
+- [ ] All existing tests pass
+- [ ] New tests added for H100 GPU types
+- [ ] Manual testing with example scripts
+- [ ] Documentation updated
+
+## Breaking Changes
+None - this is a backwards-compatible addition.
+
+Fixes #142
+```
+</Step>
+
+<Step title="Address Review Feedback">
+Respond to code review comments:
+
+- Make requested changes
+- Add clarifying comments
+- Update tests if needed
+- Push updates to the same branch
+
+```bash
+# Address feedback
+git add .
+git commit -m "Address review feedback
+
+- Add input validation as requested
+- Clarify error message wording
+- Add edge case test for empty input"
+
+git push origin feature/your-feature-name
+```
+</Step>
+</Steps>
+
+## Release Process
+
+### Version Management
+
+<AccordionGroup>
+<Accordion title="Versioning Strategy" icon="tag">
+We follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR**: Breaking changes (e.g., 1.0.0 → 2.0.0)
+- **MINOR**: New features, backwards compatible (e.g., 1.0.0 → 1.1.0)  
+- **PATCH**: Bug fixes, backwards compatible (e.g., 1.0.0 → 1.0.1)
+
+**Update locations**:
+```bash
+# Version must be updated in both places:
+# 1. pyproject.toml
+version = "0.2.0"
+
+# 2. src/chisel/__init__.py  
+__version__ = "0.2.0"
+```
+</Accordion>
+
+<Accordion title="Release Checklist" icon="list">
+Before creating a release:
+
+- [ ] Update version numbers in both files
+- [ ] Run complete test suite: `pytest tests/`
+- [ ] Test examples manually: `python examples/*.py`
+- [ ] Update CHANGELOG.md with new features and fixes
+- [ ] Update documentation for any API changes
+- [ ] Create git tag: `git tag v0.2.0`
+- [ ] Push tag: `git push origin v0.2.0`
+
+**Testing script**:
+```bash
+#!/bin/bash
+echo "🚀 Pre-release testing..."
+
+echo "🔍 Code quality..."
+ruff check src/ examples/ tests/
+ruff format src/ examples/ tests/ --check
+
+echo "🧪 Test suite..."  
+pytest tests/ -v
+
+echo "📝 Example scripts..."
+for example in examples/*.py; do
+    echo "Testing $example"
+    python "$example" || exit 1
+done
+
+echo "✅ All checks passed! Ready for release."
+```
+</Accordion>
+</AccordionGroup>
+
+## IDE Setup
+
+### VS Code Configuration
+
+<Tabs>
+<Tab title="Settings">
+Create `.vscode/settings.json`:
+
+```json
+{
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.linting.enabled": false,
+    "python.formatting.provider": "none",
+    "ruff.enable": true,
+    "ruff.organizeImports": true,
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": true,
+            "source.organizeImports.ruff": true
+        }
+    },
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestPath": "./.venv/bin/pytest"
+}
+```
+</Tab>
+
+<Tab title="Extensions">
+Recommended VS Code extensions:
+
+```json
+// .vscode/extensions.json
+{
+    "recommendations": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-vscode.test-adapter-converter",
+        "ms-vscode.extension-test-runner"
+    ]
+}
+```
+
+Install with:
+```bash
+code --install-extension charliermarsh.ruff
+code --install-extension ms-python.python
+```
+</Tab>
+
+<Tab title="Tasks">
+Create `.vscode/tasks.json` for common development tasks:
+
+```json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/pytest",
+            "args": ["tests/", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Format Code", 
+            "type": "shell",
+            "command": "${workspaceFolder}/.venv/bin/ruff",
+            "args": ["format", "src/", "tests/", "examples/"],
+            "group": "build"
+        },
+        {
+            "label": "Lint Code",
+            "type": "shell", 
+            "command": "${workspaceFolder}/.venv/bin/ruff",
+            "args": ["check", "src/", "tests/", "examples/", "--fix"],
+            "group": "build"
+        }
+    ]
+}
+```
+</Tab>
+</Tabs>
+
+### PyCharm Configuration
+
+<AccordionGroup>
+<Accordion title="Interpreter Setup" icon="gear">
+1. Go to **File** → **Settings** → **Project** → **Python Interpreter**
+2. Click gear icon → **Add** → **Existing Environment**
+3. Select `.venv/bin/python` (or `.venv\Scripts\python.exe` on Windows)
+4. Click **OK** to apply
+
+**Verify setup**:
+- Check that packages like `ruff` and `pytest` are listed
+- Test by running a Python file in the IDE
+</Accordion>
+
+<Accordion title="Code Quality Tools" icon="shield-check">
+1. Install **Ruff** plugin from marketplace
+2. Go to **Settings** → **Tools** → **Ruff**
+3. Configure paths:
+   - **Ruff executable**: `.venv/bin/ruff`
+   - **Configuration file**: `pyproject.toml`
+4. Enable **Format on save** and **Lint on save**
+
+**Testing setup**:
+1. Go to **Settings** → **Tools** → **Python Integrated Tools**
+2. Set **Default test runner** to **pytest**
+3. Set **pytest** executable to `.venv/bin/pytest`
+</Accordion>
+</AccordionGroup>
+
+## Community and Support
+
+### Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/Herdora/chisel/discussions">
+    Ask questions, share ideas, and get community help
+  </Card>
+  
+  <Card title="Email Support" icon="envelope" href="mailto:contact@herdora.com">
+    Direct support for development questions and contributions
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/Herdora/chisel/issues">
+    Report bugs, request features, and track development
+  </Card>
+  
+  <Card title="Documentation" icon="book-open" href="/api-reference/introduction">
+    Complete API reference and user guides
+  </Card>
+</CardGroup>
+
+### Community Guidelines
+
+<Tip>
+Be respectful, collaborative, and helpful when contributing to Chisel CLI.
+</Tip>
+
+**Best Practices**:
+1. **Start Small**: Begin with documentation improvements or small bug fixes
+2. **Ask Questions**: Use GitHub Discussions for questions before starting work  
+3. **Follow Standards**: Adhere to code style and testing requirements
+4. **Test Thoroughly**: Ensure your changes work correctly and don't break existing functionality
+5. **Document Changes**: Update relevant documentation and examples
+
+**Contributing Areas**:
+- 🐛 **Bug Fixes**: Fix issues reported by users
+- ✨ **Features**: Add new GPU types, authentication methods, or CLI improvements
+- 📚 **Documentation**: Improve guides, examples, and API documentation  
+- 🧪 **Testing**: Add test coverage and improve test reliability
+- 🎨 **UI/UX**: Improve CLI output, error messages, and user experience
+
+Thank you for contributing to Chisel CLI! 🚀
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book-open" href="/api-reference/introduction">
+    Complete function and class documentation
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples">
+    Working examples and usage patterns
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Setup and optimization guides
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Debug issues and get solutions
+  </Card>
+</CardGroup>

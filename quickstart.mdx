@@ -1,80 +1,330 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Getting Started"
+description: "Get up and running with Chisel CLI to accelerate your Python functions on cloud GPUs"
 ---
 
-## Get started in three steps
+Chisel CLI accelerates your Python functions by automatically running them on cloud GPUs. Get your first GPU-accelerated function running in minutes.
 
-Get your documentation site running locally and make your first customization.
+## Installation
 
-### Step 1: Set up your local environment
+<Steps>
+<Step title="Install Chisel CLI">
+  Install directly from the GitHub repository using pip:
+  
+  ```bash
+  pip install chisel-cli
+  ```
+  
+  <Tip>
+  We recommend using a virtual environment to avoid dependency conflicts.
+  </Tip>
+</Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Step title="Verify installation">
+  Test that Chisel is installed correctly:
+  
+  ```bash
+  chisel --help
+  ```
+  
+  <Check>
+  You should see the Chisel CLI help message with available commands.
+  </Check>
+</Step>
+</Steps>
+
+## Your First GPU Function
+
+<Steps>
+<Step title="Create a Python script">
+  Create a new file called `my_first_gpu_script.py`:
+  
+  ```python my_first_gpu_script.py
+  from chisel import ChiselApp, GPUType
+  
+  app = ChiselApp("my-app", gpu=GPUType.A100_80GB_1)
+  
+  @app.capture_trace(trace_name="matrix_ops")
+  def matrix_multiply(size=1000):
+      import torch
+      device = "cuda" if torch.cuda.is_available() else "cpu"
+      
+      a = torch.randn(size, size, device=device)
+      b = torch.randn(size, size, device=device)
+      result = torch.mm(a, b)
+      
+      return result.cpu().numpy()
+  
+  if __name__ == "__main__":
+      result = matrix_multiply(2000)
+      print(f"Result shape: {result.shape}")
+  ```
+  
+  <Note>
+  The `@app.capture_trace` decorator marks functions for GPU execution when using the `chisel` command.
+  </Note>
+</Step>
+
+<Step title="Test locally first">
+  Run your script locally to ensure it works:
+  
+  ```bash
+  python my_first_gpu_script.py
+  ```
+  
+  <Info>
+  Local execution uses CPU and helps verify your code works before GPU execution.
+  </Info>
+</Step>
+
+<Step title="Run on cloud GPU">
+  Execute the same script on a cloud GPU:
+  
+  ```bash
+  chisel python my_first_gpu_script.py
+  ```
+  
+  <Warning>
+  First-time execution will open your browser for authentication with Herdora.
+  </Warning>
+</Step>
+
+<Step title="Monitor execution">
+  Watch the real-time output during execution:
+  
+  - Live upload progress with spinner
+  - Instant job ID and URL when ready  
+  - Real-time stdout/stderr streaming
+  - Cost information when job completes
+  
+  <Check>
+  Your function now runs on a powerful A100 GPU in the cloud!
+  </Check>
+</Step>
+</Steps>
+
+## Key Concepts
+
+### ChiselApp Configuration
+
+The `ChiselApp` class is your main interface for GPU acceleration:
+
+<CodeGroup>
+```python Basic Setup
+from chisel import ChiselApp, GPUType
+
+app = ChiselApp("app-name", gpu=GPUType.A100_80GB_2)
+```
+
+```python Custom Upload Directory
+# Upload specific directory
+app = ChiselApp("my-app", upload_dir="./src")
+
+# Upload parent directory
+app = ChiselApp("my-app", upload_dir="../")
+```
+
+```python Multiple GPU Configs
+# Different apps for different tasks
+prep_app = ChiselApp("preprocess", gpu=GPUType.A100_80GB_1)
+train_app = ChiselApp("training", gpu=GPUType.A100_80GB_4)
+```
+</CodeGroup>
+
+**Parameters:**
+- `"app-name"`: Job tracking identifier for monitoring
+- `gpu`: GPU configuration (see options below)
+- `upload_dir`: Directory to upload (default: current directory)
+
+### GPU Types Available
+
+Choose the right GPU configuration for your workload:
+
+| Type | GPUs | Memory | Best For |
+| --- | --- | --- | --- |
+| `GPUType.A100_80GB_1` | 1x A100 | 80GB | Development, inference |
+| `GPUType.A100_80GB_2` | 2x A100 | 160GB | Medium training |
+| `GPUType.A100_80GB_4` | 4x A100 | 320GB | Large models |
+| `GPUType.A100_80GB_8` | 8x A100 | 640GB | Massive models |
+
+### @capture_trace Decorator
+
+Mark functions for GPU execution and tracing:
+
+<CodeGroup>
+```python Basic Usage
+@app.capture_trace(trace_name="operation")
+def my_function():
+    # Runs on cloud GPU when using 'chisel' command
+    pass
+```
+
+```python With Debugging
+@app.capture_trace(
+    trace_name="matrix_ops", 
+    record_shapes=True,
+    profile_memory=True
+)
+def debug_function():
+    # Enhanced debugging and profiling
+    pass
+```
+
+```python Multiple Functions
+@app.capture_trace(trace_name="preprocess")
+def preprocess(data): 
+    pass
+
+@app.capture_trace(trace_name="train")  
+def train(data): 
+    pass
+```
+</CodeGroup>
+
+## Command Line Usage
+
+<Tabs>
+<Tab title="Basic Execution">
+```bash
+# Run any Python script on GPU
+chisel python script.py
+
+# Works with modules too
+chisel python -m pytest
+chisel jupyter notebook
+```
+</Tab>
+
+<Tab title="With Arguments">
+```bash
+# Pass arguments to your script
+chisel python script.py --arg1 value --arg2 value
+
+# Complex arguments with quotes
+chisel python script.py --text "hello world" --count 100
+```
+</Tab>
+
+<Tab title="Different Commands">
+```bash
+# Any Python command works
+chisel python -c "import torch; print(torch.cuda.is_available())"
+
+# Run specific modules
+chisel python -m pip install numpy
+chisel python -m pytest tests/
+```
+</Tab>
+</Tabs>
+
+## Authentication
+
+<Steps>
+<Step title="First-time setup">
+  When you run `chisel` for the first time:
+  
+  1. Browser opens automatically
+  2. Sign in or create Herdora account
+  3. Credentials stored securely in `~/.chisel/`
+  
+  <Info>
+  Authentication happens automatically - no manual setup required!
+  </Info>
+</Step>
+
+<Step title="Credential management">
+  Manage your authentication programmatically:
+  
+  ```python
+  from chisel.auth import is_authenticated, clear_credentials
+  
+  # Check authentication status
+  if is_authenticated():
+      print("✅ Ready to use Chisel")
+  
+  # Clear credentials (if needed)
+  clear_credentials()
+  ```
+</Step>
+</Steps>
+
+## Common Patterns
+
+### Error Handling
+
+<CodeGroup>
+```python Robust Function
+@app.capture_trace(trace_name="robust")
+def robust_function(data):
+    try:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # GPU code here
+        tensor = torch.tensor(data, device=device)
+        return tensor.cpu().numpy()
+    except Exception as e:
+        print(f"Error: {e}")
+        raise
+```
+
+```python Fallback Logic
+def safe_gpu_function(data):
+    try:
+        return gpu_accelerated_version(data)
+    except RuntimeError as e:
+        print(f"GPU failed: {e}")
+        return cpu_fallback_version(data)
+```
+</CodeGroup>
+
+### Memory Management
+
+```python
+import torch
+import gc
+
+@app.capture_trace(trace_name="memory_efficient")
+def memory_efficient_processing(data):
+    torch.cuda.empty_cache()  # Clear cache
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    # Process in chunks
+    chunk_size = 1000
+    results = []
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i+chunk_size]
+        result = process_chunk(chunk)
+        results.append(result.cpu())  # Move to CPU
+        
+        del chunk, result
+        if i % (chunk_size * 10) == 0:
+            torch.cuda.empty_cache()
+            gc.collect()
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    return torch.cat(results)
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Next Steps
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+Now that you have Chisel running, explore these features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
+<Card title="API Reference" icon="book-open" href="/api-reference/introduction">
+  Complete documentation of all classes and functions
 </Card>
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
+<Card title="Working Examples" icon="code" href="/examples">
+  PyTorch training, data processing, and multi-GPU examples
 </Card>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
+<Card title="GPU Configuration" icon="gear" href="/configuration">
+  Optimize performance and choose the right GPU setup
 </Card>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
+<Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+  Solutions to common issues and debugging tips
 </Card>
-
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+**Need help?** Join our community or reach out to [contact@herdora.com](mailto:contact@herdora.com) for support.
 </Note>

@@ -1,0 +1,394 @@
+---
+title: 'GPU Types'
+description: 'Available GPU configurations and selection guide for optimal performance'
+---
+
+The `GPUType` enum provides standardized GPU configurations for different workloads. Each type represents a specific combination of GPU count and memory capacity.
+
+## GPUType Enum
+
+```python
+from chisel import GPUType
+
+# Available GPU configurations
+GPUType.A100_80GB_1  # Single A100-80GB GPU
+GPUType.A100_80GB_2  # 2x A100-80GB GPUs
+GPUType.A100_80GB_4  # 4x A100-80GB GPUs  
+GPUType.A100_80GB_8  # 8x A100-80GB GPUs
+```
+
+## GPU Specifications
+
+<AccordionGroup>
+<Accordion title="A100-80GB Single GPU" icon="microchip">
+
+<ParamField path="Type" type="GPUType.A100_80GB_1">
+Single NVIDIA A100 with 80GB HBM2e memory
+</ParamField>
+
+**Specifications:**
+- **GPU Count**: 1
+- **Memory per GPU**: 80GB HBM2e
+- **Total Memory**: 80GB
+- **CUDA Cores**: 6,912
+- **Tensor Cores**: 432 (3rd gen)
+- **Memory Bandwidth**: 2TB/s
+
+**Best For:**
+- Development and testing
+- Model inference
+- Small to medium training jobs
+- Prototyping and experimentation
+
+```python
+app = ChiselApp("inference-app", gpu=GPUType.A100_80GB_1)
+```
+</Accordion>
+
+<Accordion title="A100-80GB Dual GPU" icon="microchip">
+
+<ParamField path="Type" type="GPUType.A100_80GB_2">
+Two NVIDIA A100 GPUs with 80GB HBM2e memory each
+</ParamField>
+
+**Specifications:**
+- **GPU Count**: 2
+- **Memory per GPU**: 80GB HBM2e
+- **Total Memory**: 160GB
+- **CUDA Cores**: 13,824 (total)
+- **Tensor Cores**: 864 (total, 3rd gen)
+- **Interconnect**: NVLink 3.0
+
+**Best For:**
+- Medium-scale training
+- Balanced performance/cost
+- Multi-GPU learning
+- Data parallel training
+
+```python
+app = ChiselApp("training-app", gpu=GPUType.A100_80GB_2)
+```
+</Accordion>
+
+<Accordion title="A100-80GB Quad GPU" icon="microchip">
+
+<ParamField path="Type" type="GPUType.A100_80GB_4">
+Four NVIDIA A100 GPUs with 80GB HBM2e memory each
+</ParamField>
+
+**Specifications:**
+- **GPU Count**: 4
+- **Memory per GPU**: 80GB HBM2e
+- **Total Memory**: 320GB
+- **CUDA Cores**: 27,648 (total)
+- **Tensor Cores**: 1,728 (total, 3rd gen)
+- **Interconnect**: NVLink 3.0 with NVSwitch
+
+**Best For:**
+- Large model training
+- High-throughput inference
+- Complex multi-GPU workflows
+- Distributed training
+
+```python
+app = ChiselApp("large-training", gpu=GPUType.A100_80GB_4)
+```
+</Accordion>
+
+<Accordion title="A100-80GB Octa GPU" icon="microchip">
+
+<ParamField path="Type" type="GPUType.A100_80GB_8">
+Eight NVIDIA A100 GPUs with 80GB HBM2e memory each
+</ParamField>
+
+**Specifications:**
+- **GPU Count**: 8
+- **Memory per GPU**: 80GB HBM2e
+- **Total Memory**: 640GB
+- **CUDA Cores**: 55,296 (total)
+- **Tensor Cores**: 3,456 (total, 3rd gen)
+- **Interconnect**: Full NVLink 3.0 mesh with NVSwitch
+
+**Best For:**
+- Massive model training (LLMs, transformers)
+- Maximum throughput workloads
+- Research and experimentation
+- Production-scale training
+
+```python
+app = ChiselApp("massive-training", gpu=GPUType.A100_80GB_8)
+```
+</Accordion>
+</AccordionGroup>
+
+## Selection Guide
+
+Choose the right GPU configuration based on your specific requirements:
+
+### By Use Case
+
+<Tabs>
+<Tab title="Development & Testing">
+**Recommended: A100_80GB_1**
+
+Perfect for:
+- Code development and debugging
+- Small dataset experimentation
+- Algorithm prototyping
+- Model inference testing
+
+```python
+# Development setup
+dev_app = ChiselApp("development", gpu=GPUType.A100_80GB_1)
+
+@dev_app.capture_trace(trace_name="debug")
+def test_function(data):
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Development code here
+    return result
+```
+</Tab>
+
+<Tab title="Training Small-Medium Models">
+**Recommended: A100_80GB_2**
+
+Optimal for:
+- Most PyTorch models
+- Computer vision tasks
+- NLP models up to ~7B parameters
+- Data parallel training
+
+```python
+# Training setup
+train_app = ChiselApp("training", gpu=GPUType.A100_80GB_2)
+
+@train_app.capture_trace(trace_name="training")
+def train_model(data_loader, model):
+    import torch
+    from torch.nn.parallel import DataParallel
+    
+    if torch.cuda.device_count() > 1:
+        model = DataParallel(model)
+    
+    model = model.cuda()
+    # Training logic here
+    return trained_model
+```
+</Tab>
+
+<Tab title="Large Model Training">
+**Recommended: A100_80GB_4 or A100_80GB_8**
+
+Required for:
+- Large language models (10B+ parameters)
+- High-resolution image models
+- Complex multi-modal architectures
+- Pipeline parallel training
+
+```python
+# Large model setup
+large_app = ChiselApp("large-training", gpu=GPUType.A100_80GB_8)
+
+@large_app.capture_trace(trace_name="large_model_training")
+def train_large_model(data_loader, model):
+    import torch
+    from torch.nn.parallel import DistributedDataParallel
+    
+    # Setup for distributed training
+    model = DistributedDataParallel(model)
+    # Large model training logic
+    return trained_model
+```
+</Tab>
+
+<Tab title="High-Throughput Inference">
+**Recommended: A100_80GB_4**
+
+Best for:
+- Batch inference workloads
+- Real-time serving at scale
+- Multiple model deployment
+- Concurrent request handling
+
+```python
+# Inference setup
+inference_app = ChiselApp("inference", gpu=GPUType.A100_80GB_4)
+
+@inference_app.capture_trace(trace_name="batch_inference")
+def batch_inference(data_batches, models):
+    import torch
+    
+    results = []
+    for batch, model in zip(data_batches, models):
+        model = model.cuda()
+        with torch.no_grad():
+            result = model(batch.cuda())
+            results.append(result.cpu())
+    
+    return results
+```
+</Tab>
+</Tabs>
+
+### By Memory Requirements
+
+| Model Size | Parameters | Recommended GPU | Memory Reasoning |
+| --- | --- | --- | --- |
+| Small | < 1B | A100_80GB_1 | Fits comfortably in 80GB |
+| Medium | 1B - 7B | A100_80GB_2 | Benefits from parallel processing |
+| Large | 7B - 30B | A100_80GB_4 | Requires distributed memory |
+| Massive | 30B+ | A100_80GB_8 | Needs maximum memory capacity |
+
+### Performance Scaling
+
+<Note>
+GPU scaling is not always linear. Consider your specific workload characteristics.
+</Note>
+
+```python
+# Example: Testing scaling performance
+def benchmark_scaling():
+    import time
+    
+    configurations = [
+        GPUType.A100_80GB_1,
+        GPUType.A100_80GB_2,
+        GPUType.A100_80GB_4,
+        GPUType.A100_80GB_8
+    ]
+    
+    for gpu_type in configurations:
+        app = ChiselApp(f"benchmark-{gpu_type.name}", gpu=gpu_type)
+        
+        @app.capture_trace(trace_name="benchmark")
+        def benchmark_workload(data):
+            import torch
+            start_time = time.time()
+            
+            # Your workload here
+            result = process_data(data)
+            
+            end_time = time.time()
+            print(f"{gpu_type.name}: {end_time - start_time:.2f}s")
+            return result
+```
+
+## Usage Examples
+
+### Basic Usage
+
+<CodeGroup>
+```python Direct Assignment
+from chisel import ChiselApp, GPUType
+
+# Direct enum usage (recommended)
+app = ChiselApp("my-app", gpu=GPUType.A100_80GB_2)
+```
+
+```python Dynamic Selection
+def select_gpu_by_model_size(param_count):
+    if param_count < 1_000_000_000:  # < 1B parameters
+        return GPUType.A100_80GB_1
+    elif param_count < 7_000_000_000:  # < 7B parameters
+        return GPUType.A100_80GB_2
+    elif param_count < 30_000_000_000:  # < 30B parameters
+        return GPUType.A100_80GB_4
+    else:
+        return GPUType.A100_80GB_8
+
+# Usage
+model_params = count_parameters(my_model)
+gpu_type = select_gpu_by_model_size(model_params)
+app = ChiselApp("dynamic-app", gpu=gpu_type)
+```
+
+```python String Conversion
+# Get string representation
+gpu_string = GPUType.A100_80GB_2.value  # "A100-80GB:2"
+
+# List all available types
+for gpu in GPUType:
+    print(f"{gpu.name} = {gpu.value}")
+```
+</CodeGroup>
+
+### Multi-App Workflow
+
+```python
+from chisel import ChiselApp, GPUType
+
+# Different apps for different stages
+preprocessing_app = ChiselApp("preprocess", gpu=GPUType.A100_80GB_1)
+training_app = ChiselApp("train", gpu=GPUType.A100_80GB_4) 
+evaluation_app = ChiselApp("evaluate", gpu=GPUType.A100_80GB_2)
+
+@preprocessing_app.capture_trace(trace_name="data_prep")
+def preprocess_data(raw_data):
+    # Light GPU work for data preprocessing
+    return processed_data
+
+@training_app.capture_trace(trace_name="model_training")
+def train_model(processed_data):
+    # Heavy GPU work requiring 4 GPUs
+    return trained_model
+
+@evaluation_app.capture_trace(trace_name="model_eval")
+def evaluate_model(model, test_data):
+    # Medium GPU work for evaluation
+    return metrics
+```
+
+## Cost Optimization
+
+<Tip>
+Choose the smallest GPU configuration that meets your performance requirements to optimize costs.
+</Tip>
+
+### Cost-Performance Guidelines
+
+1. **Start Small**: Begin with A100_80GB_1 for development
+2. **Scale Gradually**: Move to larger configurations only when needed
+3. **Monitor Usage**: Track GPU utilization to ensure efficient usage
+4. **Batch Processing**: Group operations to maximize GPU utilization
+
+```python
+# Cost-aware GPU selection
+def cost_effective_selection(workload_type, data_size, time_constraint):
+    if workload_type == "development":
+        return GPUType.A100_80GB_1
+    
+    elif workload_type == "training":
+        if data_size < 1_000_000:  # Small dataset
+            return GPUType.A100_80GB_1
+        elif data_size < 10_000_000:  # Medium dataset
+            return GPUType.A100_80GB_2
+        else:  # Large dataset
+            return GPUType.A100_80GB_4 if time_constraint else GPUType.A100_80GB_2
+    
+    elif workload_type == "inference":
+        return GPUType.A100_80GB_2  # Good balance for most inference
+    
+    else:
+        return GPUType.A100_80GB_1  # Safe default
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="ChiselApp" icon="rocket" href="/api-reference/chisel-app">
+    Main application class documentation
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Performance tuning and optimization guide
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples">
+    Working examples for different GPU configurations
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    GPU-related issues and solutions
+  </Card>
+</CardGroup> 

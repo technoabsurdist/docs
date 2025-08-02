@@ -1,0 +1,478 @@
+---
+title: 'Authentication'
+description: 'Authentication functions and credential management for Chisel CLI'
+---
+
+Chisel CLI uses secure authentication to connect to the Herdora backend. Authentication is handled automatically when you first use the `chisel` command, but you can also manage credentials programmatically.
+
+## Authentication Functions
+
+### is_authenticated()
+
+Check if the user is currently authenticated with valid credentials.
+
+```python
+from chisel.auth import is_authenticated
+
+if is_authenticated():
+    print("✅ Ready to use Chisel")
+else:
+    print("❌ Authentication required")
+```
+
+<ResponseField name="return" type="boolean">
+Returns `True` if valid credentials exist and are accessible, `False` otherwise.
+</ResponseField>
+
+**Usage Examples:**
+
+<CodeGroup>
+```python Basic Check
+from chisel.auth import is_authenticated
+
+def check_auth_status():
+    if is_authenticated():
+        return "authenticated"
+    else:
+        return "not_authenticated"
+
+status = check_auth_status()
+print(f"Auth status: {status}")
+```
+
+```python Conditional Logic
+from chisel.auth import is_authenticated
+from chisel import ChiselApp, GPUType
+
+def create_app_safely():
+    if not is_authenticated():
+        print("⚠️  Authentication required. Run 'chisel' command first.")
+        return None
+    
+    return ChiselApp("my-app", gpu=GPUType.A100_80GB_1)
+
+app = create_app_safely()
+```
+</CodeGroup>
+
+### authenticate()
+
+Manually trigger the authentication flow. Opens browser for user authentication.
+
+```python
+from chisel.auth import authenticate
+
+api_key = authenticate(backend_url="http://localhost:8000")
+```
+
+<ParamField path="backend_url" type="string" default="http://localhost:8000">
+The backend URL to authenticate against. Defaults to local development server.
+</ParamField>
+
+<ResponseField name="return" type="string">
+Returns the API key on successful authentication, raises RuntimeError on failure.
+</ResponseField>
+
+**Usage Examples:**
+
+<CodeGroup>
+```python Manual Authentication
+from chisel.auth import authenticate
+
+try:
+    api_key = authenticate()
+    print("✅ Authentication successful")
+except RuntimeError as e:
+    print(f"❌ Authentication failed: {e}")
+```
+
+```python Custom Backend
+from chisel.auth import authenticate
+import os
+
+# Use production backend
+backend_url = os.environ.get("CHISEL_BACKEND_URL", "https://api.herdora.com")
+
+try:
+    api_key = authenticate(backend_url)
+    print("✅ Authenticated with production backend")
+except Exception as e:
+    print(f"❌ Failed to authenticate: {e}")
+```
+
+```python Retry Logic
+from chisel.auth import authenticate, clear_credentials
+import time
+
+def authenticate_with_retry(max_attempts=3):
+    for attempt in range(max_attempts):
+        try:
+            api_key = authenticate()
+            return api_key
+        except RuntimeError as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_attempts - 1:
+                clear_credentials()  # Clear potentially corrupted credentials
+                time.sleep(2)  # Wait before retry
+            else:
+                raise e
+
+api_key = authenticate_with_retry()
+```
+</CodeGroup>
+
+### clear_credentials()
+
+Remove stored authentication credentials. Useful for logout or credential reset.
+
+```python
+from chisel.auth import clear_credentials
+
+clear_credentials()
+print("🔓 Credentials cleared")
+```
+
+<ResponseField name="return" type="None">
+No return value. Credentials are removed from storage.
+</ResponseField>
+
+**Usage Examples:**
+
+<CodeGroup>
+```python Simple Logout
+from chisel.auth import clear_credentials, is_authenticated
+
+def logout():
+    if is_authenticated():
+        clear_credentials()
+        print("🔓 Successfully logged out")
+    else:
+        print("ℹ️  Already logged out")
+
+logout()
+```
+
+```python Credential Reset
+from chisel.auth import clear_credentials, authenticate
+
+def reset_credentials():
+    print("🔄 Resetting credentials...")
+    clear_credentials()
+    
+    try:
+        api_key = authenticate()
+        print("✅ Credentials reset successfully")
+        return api_key
+    except RuntimeError as e:
+        print(f"❌ Failed to reset credentials: {e}")
+        raise
+
+new_api_key = reset_credentials()
+```
+
+```python Troubleshooting
+from chisel.auth import clear_credentials, is_authenticated
+
+def troubleshoot_auth():
+    print("🔍 Troubleshooting authentication...")
+    
+    if is_authenticated():
+        print("✅ Currently authenticated")
+    else:
+        print("❌ Not authenticated - clearing potentially corrupted credentials")
+        clear_credentials()
+        print("💡 Run 'chisel' command to re-authenticate")
+
+troubleshoot_auth()
+```
+</CodeGroup>
+
+## Credential Storage
+
+### Storage Location
+
+Credentials are stored securely in the user's home directory:
+
+```bash
+~/.chisel/credentials.json
+```
+
+<Note>
+The credentials file has restricted permissions (600) for security.
+</Note>
+
+### File Structure
+
+The credentials file contains:
+
+```json
+{
+  "api_key": "your_encrypted_api_key_here",
+  "backend_url": "http://localhost:8000",
+  "expires_at": "2024-12-31T23:59:59Z"
+}
+```
+
+<Warning>
+Never manually edit the credentials file. Use the provided authentication functions instead.
+</Warning>
+
+### Security Features
+
+<AccordionGroup>
+<Accordion title="File Permissions" icon="lock">
+- Credentials file has `600` permissions (read/write for owner only)
+- Directory has `700` permissions (access for owner only)
+- Other users cannot read your credentials
+</Accordion>
+
+<Accordion title="Encryption" icon="shield">
+- API keys are encrypted before storage
+- Uses secure local encryption methods
+- Keys are never stored in plain text
+</Accordion>
+
+<Accordion title="Expiration" icon="clock">
+- Credentials have expiration timestamps
+- Automatic refresh when approaching expiration
+- Invalid credentials are automatically cleared
+</Accordion>
+</AccordionGroup>
+
+## Authentication Flow
+
+<Steps>
+<Step title="Initial Authentication">
+When you first run `chisel`:
+
+1. Checks for existing valid credentials
+2. If none found, opens browser for authentication
+3. User logs in or creates Herdora account
+4. API key is generated and stored securely
+5. Future `chisel` commands use stored credentials
+
+```bash
+# First time usage
+chisel python my_script.py
+# → Opens browser for authentication
+# → Credentials stored
+# → Script executes on GPU
+```
+</Step>
+
+<Step title="Automatic Authentication">
+For subsequent uses:
+
+1. Checks stored credentials
+2. Validates expiration and authenticity
+3. Uses existing credentials if valid
+4. Refreshes credentials if near expiration
+5. Prompts for re-authentication if invalid
+
+```bash
+# Subsequent usage
+chisel python my_script.py
+# → Uses stored credentials
+# → Script executes immediately
+```
+</Step>
+
+<Step title="Re-authentication">
+When credentials expire or become invalid:
+
+1. Detects authentication failure
+2. Clears invalid credentials
+3. Initiates new authentication flow
+4. Updates stored credentials
+5. Retries original request
+
+```bash
+# When credentials expire
+chisel python my_script.py
+# → Detects expired credentials
+# → Opens browser for re-authentication
+# → Updates credentials
+# → Script executes
+```
+</Step>
+</Steps>
+
+## Environment Variables
+
+Authentication can be influenced by environment variables:
+
+<ParamField path="CHISEL_BACKEND_URL" type="string">
+Override the default backend URL for authentication.
+</ParamField>
+
+<ParamField path="CHISEL_API_KEY" type="string">
+Directly provide API key (bypasses file-based credentials).
+</ParamField>
+
+**Examples:**
+
+<CodeGroup>
+```bash Custom Backend
+export CHISEL_BACKEND_URL="https://api.herdora.com"
+chisel python my_script.py
+```
+
+```bash Direct API Key
+export CHISEL_API_KEY="your_api_key_here"
+chisel python my_script.py
+```
+
+```python Environment Check
+import os
+from chisel.auth import is_authenticated
+
+def check_auth_method():
+    if os.environ.get("CHISEL_API_KEY"):
+        return "environment_variable"
+    elif is_authenticated():
+        return "stored_credentials"
+    else:
+        return "not_authenticated"
+
+method = check_auth_method()
+print(f"Authentication method: {method}")
+```
+</CodeGroup>
+
+## Error Handling
+
+Common authentication errors and solutions:
+
+<AccordionGroup>
+<Accordion title="RuntimeError: Authentication failed">
+**Cause:** Browser authentication was cancelled or failed
+
+**Solutions:**
+```python
+from chisel.auth import clear_credentials, authenticate
+
+# Clear potentially corrupted credentials
+clear_credentials()
+
+# Retry authentication
+try:
+    authenticate()
+except RuntimeError:
+    print("Please complete authentication in browser")
+```
+</Accordion>
+
+<Accordion title="FileNotFoundError: Credentials not found">
+**Cause:** Credentials file doesn't exist or was deleted
+
+**Solution:**
+```python
+from chisel.auth import authenticate
+
+# Simply authenticate again
+authenticate()  # Will create new credentials file
+```
+</Accordion>
+
+<Accordion title="PermissionError: Cannot access credentials">
+**Cause:** Incorrect file permissions on credentials
+
+**Solution:**
+```bash
+# Fix permissions manually
+chmod 600 ~/.chisel/credentials.json
+chmod 700 ~/.chisel/
+```
+</Accordion>
+</AccordionGroup>
+
+## Integration Examples
+
+### With ChiselApp
+
+```python
+from chisel import ChiselApp, GPUType
+from chisel.auth import is_authenticated, authenticate
+
+def create_authenticated_app(name, gpu_type):
+    """Create ChiselApp with authentication check."""
+    if not is_authenticated():
+        print("🔐 Authentication required...")
+        try:
+            authenticate()
+        except RuntimeError as e:
+            print(f"❌ Authentication failed: {e}")
+            return None
+    
+    return ChiselApp(name, gpu=gpu_type)
+
+# Usage
+app = create_authenticated_app("my-app", GPUType.A100_80GB_2)
+if app:
+    @app.capture_trace(trace_name="secure_operation")
+    def secure_gpu_function(data):
+        # Your GPU code here
+        return result
+```
+
+### Script Template
+
+```python
+#!/usr/bin/env python3
+"""
+Secure Chisel script template with authentication handling.
+"""
+
+import sys
+from chisel import ChiselApp, GPUType
+from chisel.auth import is_authenticated, authenticate, clear_credentials
+
+def main():
+    # Check authentication status
+    if not is_authenticated():
+        print("🔐 Chisel authentication required")
+        try:
+            authenticate()
+            print("✅ Authentication successful")
+        except RuntimeError as e:
+            print(f"❌ Authentication failed: {e}")
+            print("💡 Please ensure you can access the browser for authentication")
+            sys.exit(1)
+    
+    # Create app with authentication verified
+    app = ChiselApp("secure-app", gpu=GPUType.A100_80GB_1)
+    
+    @app.capture_trace(trace_name="main_processing")
+    def process_data(data):
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Your processing logic
+        return result
+    
+    # Your main logic here
+    result = process_data(your_data)
+    print(f"Processing complete: {result}")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="ChiselApp" icon="rocket" href="/api-reference/chisel-app">
+    Main application class that uses authentication
+  </Card>
+  
+  <Card title="CLI Commands" icon="terminal" href="/api-reference/cli">
+    Command-line interface and authentication flow
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting#authentication-issues">
+    Authentication troubleshooting guide
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/configuration#authentication">
+    Authentication configuration options
+  </Card>
+</CardGroup> 

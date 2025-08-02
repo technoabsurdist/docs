@@ -1,33 +1,220 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: 'API Reference'
+description: 'Complete reference for Chisel CLI classes, functions, and command-line interface'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+Complete documentation for all Chisel CLI components including the Python API, command-line interface, and configuration options.
 
-## Welcome
+## Overview
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+Chisel CLI provides a simple Python API for GPU acceleration with minimal changes to your existing code. The main components are:
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+<CardGroup cols={2}>
+  <Card title="ChiselApp" icon="rocket" href="/api-reference/chisel-app">
+    Main class for creating GPU-accelerated applications
+  </Card>
+  
+  <Card title="GPU Types" icon="microchip" href="/api-reference/gpu-types">
+    Available GPU configurations and selection guide
+  </Card>
+  
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    Authentication functions and credential management
+  </Card>
+  
+  <Card title="CLI Commands" icon="terminal" href="/api-reference/cli">
+    Command-line interface and environment variables
+  </Card>
+</CardGroup>
 
-## Authentication
+## Quick Reference
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+### Basic Usage Pattern
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+```python
+from chisel import ChiselApp, GPUType
+
+# Create app with GPU configuration
+app = ChiselApp("my-app", gpu=GPUType.A100_80GB_2)
+
+# Mark functions for GPU execution
+@app.capture_trace(trace_name="my_operation")
+def my_gpu_function(data):
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Your GPU code here
+    return result
+
+# Execute on cloud GPU
+# chisel python my_script.py
 ```
+
+### Import Reference
+
+<CodeGroup>
+```python Core Classes
+from chisel import ChiselApp, GPUType
+```
+
+```python Authentication
+from chisel.auth import (
+    is_authenticated,
+    authenticate, 
+    clear_credentials
+)
+```
+
+```python Environment Variables
+import os
+
+# Key environment variables
+CHISEL_ACTIVATED = os.environ.get("CHISEL_ACTIVATED")
+CHISEL_BACKEND_URL = os.environ.get("CHISEL_BACKEND_URL")
+CHISEL_API_KEY = os.environ.get("CHISEL_API_KEY")
+```
+</CodeGroup>
+
+## How It Works
+
+<Steps>
+<Step title="Local Mode">
+When `CHISEL_ACTIVATED != "1"`:
+- ChiselApp runs in inactive mode
+- Decorators are pass-through (no-op)
+- Code runs normally on local machine
+
+```python
+# This runs locally
+python my_script.py
+```
+</Step>
+
+<Step title="Chisel Mode">
+When using the `chisel` command:
+- Sets `CHISEL_ACTIVATED=1` environment variable
+- Activates GPU functionality in ChiselApp
+- Uploads code and runs on cloud GPU
+
+```bash
+# This runs on cloud GPU
+chisel python my_script.py
+```
+</Step>
+
+<Step title="Backend Mode">
+When `CHISEL_BACKEND_RUN=1` (set by backend):
+- Detects execution on cloud infrastructure
+- Skips authentication and upload steps
+- Executes functions with GPU tracing enabled
+</Step>
+</Steps>
+
+## Type Hints Support
+
+Chisel CLI includes full type hint support for modern Python development:
+
+```python
+from typing import Optional, Any
+from chisel import ChiselApp, GPUType
+import numpy as np
+
+def create_app(name: str, gpu: Optional[GPUType] = None) -> ChiselApp:
+    return ChiselApp(name, gpu=gpu)
+
+@app.capture_trace(trace_name="typed_function")
+def process_data(data: np.ndarray, size: int = 1000) -> np.ndarray:
+    import torch
+    tensor = torch.from_numpy(data)
+    return (tensor * 2).numpy()
+```
+
+## Error Handling
+
+All Chisel CLI functions include proper error handling with descriptive messages:
+
+<AccordionGroup>
+<Accordion title="Authentication Errors">
+```python
+RuntimeError("❌ Authentication failed. Unable to get valid API key.")
+```
+
+**Solution:** Clear credentials and re-authenticate
+```python
+from chisel.auth import clear_credentials
+clear_credentials()
+```
+</Accordion>
+
+<Accordion title="Upload Directory Errors">
+```python
+AssertionError("Script /path/to/script.py is not inside upload_dir /path/to/upload")
+```
+
+**Solution:** Ensure script is within the specified upload directory
+```python
+app = ChiselApp("my-app", upload_dir="./correct_directory")
+```
+</Accordion>
+
+<Accordion title="GPU Memory Errors">
+```python
+RuntimeError: CUDA out of memory
+```
+
+**Solution:** Use larger GPU or reduce batch size
+```python
+app = ChiselApp("my-app", gpu=GPUType.A100_80GB_4)  # More memory
+```
+</Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Tip>
+Follow these patterns for optimal Chisel CLI usage:
+</Tip>
+
+1. **Always test locally first** - Verify your code works before GPU execution
+2. **Use appropriate GPU types** - Match GPU memory to your workload requirements  
+3. **Handle device placement** - Check for CUDA availability in your functions
+4. **Manage memory efficiently** - Clear GPU cache and process in batches for large data
+5. **Use meaningful trace names** - Help with debugging and monitoring
+
+```python
+# Example following best practices
+@app.capture_trace(trace_name="data_processing", record_shapes=True)
+def process_large_dataset(data):
+    import torch
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Process in chunks to manage memory
+    batch_size = 1000
+    results = []
+    
+    for i in range(0, len(data), batch_size):
+        batch = data[i:i+batch_size]
+        batch_tensor = torch.tensor(batch, device=device)
+        
+        # Your processing here
+        result = process_batch(batch_tensor)
+        results.append(result.cpu())  # Move back to CPU
+        
+        # Clear GPU memory periodically
+        if i % (batch_size * 10) == 0:
+            torch.cuda.empty_cache()
+    
+    return torch.cat(results)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="ChiselApp API" icon="rocket" href="/api-reference/chisel-app">
+    Detailed ChiselApp class documentation
+  </Card>
+  
+  <Card title="Working Examples" icon="code" href="/examples">
+    Complete examples and usage patterns
+  </Card>
+</CardGroup>

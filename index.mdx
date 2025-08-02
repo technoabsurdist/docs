@@ -1,97 +1,91 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Documentation"
+description: "chisel lets you profile your inference workloads on cloud GPUs without any infrastructure setup."
 ---
 
-## Setting up
+## Quick Start
 
-Get your documentation site up and running in minutes.
+Get GPU acceleration in 3 steps:
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+<Steps>
+<Step title="Install">
+```bash
+pip install chisel-cli
+```
+</Step>
+
+<Step title="Create your script">
+```python my_script.py
+from chisel import ChiselApp, GPUType
+
+# here we're choosing 1xA100-80GB
+# go to /configuration to learn about GPU types
+app = ChiselApp("my-app", gpu=GPUType.A100_80GB_1)
+
+@app.capture_trace(trace_name="gpu_task")
+def gpu_function():
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Your GPU code here
+    x = torch.randn(1000, 1000, device=device)
+    y = torch.randn(1000, 1000, device=device)
+    return torch.mm(x, y).cpu().numpy()
+
+if __name__ == "__main__":
+    result = gpu_function()
+    print(f"Result shape: {result.shape}")
+```
+</Step>
+
+<Step title="Run on GPU">
+```bash
+# Local execution (CPU)
+# executes locally, not using chisel
+python my_script.py
+
+# Cloud GPU execution
+# executes on cloud GPU, using chisel
+chisel python my_script.py
+```
+
+<Check>
+First run opens browser for authentication, then your code runs on A100 GPUs automatically.
+</Check>
+</Step>
+</Steps>
+
+## GPU Options
+
+| Type | GPUs | Memory | Best For |
+| --- | --- | --- | --- |
+| `GPUType.A100_80GB_1` | 1x A100 | 80GB | Development, inference |
+| `GPUType.A100_80GB_2` | 2x A100 | 160GB | Medium training |
+| `GPUType.A100_80GB_4` | 4x A100 | 320GB | Large models |
+| `GPUType.A100_80GB_8` | 8x A100 | 640GB | Massive models |
+
+## Documentation
+
+<CardGroup cols={2}>
+<Card title="Complete Guide" icon="book-open" href="/quickstart">
+  Detailed setup and examples
 </Card>
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+<Card title="API Reference" icon="code" href="/api-reference/introduction">
+  Complete API documentation
 </Card>
+
+<Card title="Examples" icon="rocket" href="/examples">
+  PyTorch, data processing, multi-GPU
+</Card>
+
+<Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+  Common issues and solutions
+</Card>
+</CardGroup>
+
+## Support
+
+- 📧 **Email**: [contact@herdora.com](mailto:contact@herdora.com)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/Herdora/chisel/issues)
+- 📖 **Source**: [GitHub Repository](https://github.com/Herdora/chisel)

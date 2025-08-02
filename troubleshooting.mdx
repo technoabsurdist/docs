@@ -1,0 +1,1039 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions when using Chisel CLI with step-by-step debugging guides"
+---
+
+Resolve common issues when using Chisel CLI with comprehensive troubleshooting guides and solutions.
+
+## Quick Issue Resolution
+
+<Tip>
+Most issues can be resolved quickly by checking authentication, upload size, and GPU memory requirements.
+</Tip>
+
+| Issue Type | Quick Check | Common Solution |
+| --- | --- | --- |
+| Authentication | `chisel.auth.is_authenticated()` | Re-authenticate with `chisel` command |
+| Upload fails | Directory size < 100MB | Add files to `.gitignore` |
+| GPU memory | Reduce batch size | Use larger GPU type |
+| Script not found | Script in upload directory | Check `upload_dir` parameter |
+| Network issues | Check connectivity | Verify `CHISEL_BACKEND_URL` |
+
+## Installation Issues
+
+<AccordionGroup>
+<Accordion title="ModuleNotFoundError: No module named 'chisel'" icon="exclamation-triangle">
+**Symptoms:** Import error when trying to use Chisel CLI
+
+**Causes:**
+- Chisel CLI not installed
+- Wrong virtual environment
+- Installation failed
+
+**Solutions:**
+
+<CodeGroup>
+```bash Install in Development Mode
+# Recommended: Install in virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# OR .venv\Scripts\activate  # Windows
+
+pip install chisel-cli
+```
+
+```bash Verify Installation
+# Check if Chisel is installed
+pip list | grep chisel
+
+# Test import
+python -c "from chisel import ChiselApp; print('✅ Chisel imported successfully')"
+
+# Check CLI command
+chisel --help
+```
+
+```bash Troubleshoot Installation
+# Upgrade pip first
+pip install --upgrade pip
+
+# Force reinstall
+pip uninstall chisel-cli
+pip install --force-reinstall git+https://github.com/Herdora/chisel.git@dev
+
+# Check Python path
+python -c "import sys; print(sys.path)"
+```
+</CodeGroup>
+
+<Check>
+After successful installation, you should be able to import `chisel` and run `chisel --help`.
+</Check>
+</Accordion>
+
+<Accordion title="externally-managed-environment Error" icon="lock">
+**Symptoms:** pip refuses to install packages due to externally managed environment
+
+**Cause:** System Python protection on newer Linux distributions
+
+**Solutions:**
+
+<CodeGroup>
+```bash Virtual Environment (Recommended)
+# Create isolated environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install Chisel
+pip install chisel-cli
+```
+
+```bash User Installation
+# Install for current user only
+pip install --user git+https://github.com/Herdora/chisel.git@dev
+
+# Add user bin to PATH
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+```bash Docker Alternative
+# Use Docker if system restrictions are too strict
+docker run -it python:3.9
+pip install git+https://github.com/Herdora/chisel.git@dev
+```
+</CodeGroup>
+
+<Warning>
+Always prefer virtual environments over system-wide installations to avoid conflicts.
+</Warning>
+</Accordion>
+
+<Accordion title="Permission Errors During Installation" icon="shield">
+**Symptoms:** Permission denied errors during pip install
+
+**Causes:**
+- Insufficient permissions for system directories
+- Write-protected directories
+- System Python restrictions
+
+**Solutions:**
+
+<CodeGroup>
+```bash Virtual Environment Solution
+# Best practice: Use virtual environment
+python -m venv chisel_env
+source chisel_env/bin/activate
+pip install chisel-cli
+```
+
+```bash User Installation
+# Install to user directory (no admin required)
+pip install --user git+https://github.com/Herdora/chisel.git@dev
+
+# Ensure user bin is in PATH
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+```bash Fix Directory Permissions
+# If using your own Python installation
+sudo chown -R $(whoami) /path/to/python/site-packages
+
+# Or create writable directory
+mkdir -p ~/.local/lib/python3.9/site-packages
+export PYTHONPATH="$HOME/.local/lib/python3.9/site-packages:$PYTHONPATH"
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Authentication Issues
+
+<AccordionGroup>
+<Accordion title="Browser Doesn't Open for Authentication" icon="browser">
+**Symptoms:** No browser window opens when running `chisel` for the first time
+
+**Common Causes:**
+- SSH/remote environment without display
+- Headless system
+- Browser configuration issues
+- Firewall blocking browser communication
+
+**Solutions:**
+
+<Tabs>
+<Tab title="SSH Environment">
+```bash
+# Use SSH port forwarding
+ssh -L 8000:localhost:8000 user@remote-host
+
+# Then run chisel command on remote host
+chisel python my_script.py
+# Browser will open on your local machine
+```
+</Tab>
+
+<Tab title="Manual Authentication">
+```python
+# Authenticate programmatically
+from chisel.auth import authenticate
+
+try:
+    api_key = authenticate("http://localhost:8000")
+    print("✅ Authentication successful")
+except RuntimeError as e:
+    print(f"❌ Authentication failed: {e}")
+```
+</Tab>
+
+<Tab title="Environment Variables">
+```bash
+# Use API key directly (for CI/CD)
+export CHISEL_API_KEY="your_api_key_here"
+chisel python my_script.py
+
+# Or specify custom backend
+export CHISEL_BACKEND_URL="https://api.herdora.com"
+chisel python my_script.py
+```
+</Tab>
+</Tabs>
+
+<Info>
+For automated environments, obtain an API key through the web interface and use environment variables.
+</Info>
+</Accordion>
+
+<Accordion title="Authentication Fails After Success" icon="key">
+**Symptoms:** Authentication worked before but now fails
+
+**Causes:**
+- Expired credentials
+- Corrupted credential file
+- Backend URL changed
+- Network connectivity issues
+
+**Step-by-step Resolution:**
+
+<Steps>
+<Step title="Check current status">
+```python
+from chisel.auth import is_authenticated
+print(f"Authenticated: {is_authenticated()}")
+```
+</Step>
+
+<Step title="Clear existing credentials">
+```python
+from chisel.auth import clear_credentials
+clear_credentials()
+print("🔓 Credentials cleared")
+```
+</Step>
+
+<Step title="Test backend connectivity">
+```bash
+# Test if backend is reachable
+curl -v http://localhost:8000/health
+
+# Or custom backend
+curl -v $CHISEL_BACKEND_URL/health
+```
+</Step>
+
+<Step title="Re-authenticate">
+```bash
+# Let chisel handle authentication
+chisel python -c "print('Testing authentication')"
+```
+</Step>
+</Steps>
+
+<Check>
+After re-authentication, test with a simple command to verify it's working.
+</Check>
+</Accordion>
+
+<Accordion title="API Key Errors" icon="exclamation-triangle">
+**Symptoms:** "Invalid API key" or "API key expired" errors
+
+**Immediate Solutions:**
+
+<CodeGroup>
+```python Clear and Re-authenticate
+from chisel.auth import clear_credentials, authenticate
+
+# Clear potentially corrupted credentials
+clear_credentials()
+
+# Re-authenticate
+try:
+    api_key = authenticate()
+    print("✅ New authentication successful")
+except RuntimeError as e:
+    print(f"❌ Re-authentication failed: {e}")
+```
+
+```bash Check Credentials File
+# Check if file exists and permissions
+ls -la ~/.chisel/credentials.json
+
+# Check file contents (be careful not to expose secrets)
+python -c "
+import json
+try:
+    with open('~/.chisel/credentials.json') as f:
+        creds = json.load(f)
+    print('✅ Credentials file valid')
+except Exception as e:
+    print(f'❌ Credentials file issue: {e}')
+"
+```
+
+```bash Manual File Cleanup
+# Remove corrupted credentials file
+rm -f ~/.chisel/credentials.json
+
+# Recreate directory with correct permissions
+mkdir -p ~/.chisel
+chmod 700 ~/.chisel
+
+# Re-authenticate
+chisel python -c "print('Re-authenticating')"
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Runtime Issues
+
+<AccordionGroup>
+<Accordion title="CUDA Out of Memory" icon="memory">
+**Symptoms:** `RuntimeError: CUDA out of memory` during execution
+
+**Immediate Solutions:**
+
+<CodeGroup>
+```python Reduce Batch Size
+# Original code causing memory issues
+batch_size = 256  # Too large
+
+# Reduced batch size
+batch_size = 32  # Start smaller
+
+# Or dynamic batch size
+import torch
+
+def find_safe_batch_size(model, input_shape, start_size=32):
+    batch_size = start_size
+    while batch_size >= 1:
+        try:
+            test_input = torch.randn(batch_size, *input_shape, device='cuda')
+            with torch.no_grad():
+                _ = model(test_input)
+            print(f"✅ Safe batch size: {batch_size}")
+            return batch_size
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                batch_size //= 2
+                torch.cuda.empty_cache()
+            else:
+                raise e
+    return 1
+```
+
+```python Clear GPU Memory
+import torch
+import gc
+
+# Clear GPU cache before operations
+torch.cuda.empty_cache()
+gc.collect()
+
+# Process in chunks
+def process_large_data(data, chunk_size=1000):
+    results = []
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i+chunk_size]
+        
+        # Process chunk
+        result = process_chunk(chunk)
+        results.append(result.cpu())  # Move to CPU
+        
+        # Clear memory
+        del chunk, result
+        torch.cuda.empty_cache()
+    
+    return torch.cat(results)
+```
+
+```python Use Larger GPU Type
+from chisel import ChiselApp, GPUType
+
+# Instead of single GPU
+# app = ChiselApp("my-app", gpu=GPUType.A100_80GB_1)
+
+# Use larger GPU
+app = ChiselApp("my-app", gpu=GPUType.A100_80GB_4)
+```
+</CodeGroup>
+
+<Warning>
+If memory errors persist even with optimizations, you may need a larger GPU configuration.
+</Warning>
+</Accordion>
+
+<Accordion title="Job Submission Fails" icon="upload">
+**Symptoms:** `❌ Work upload failed` or upload errors
+
+**Common Causes:**
+- Upload directory too large (>100MB)
+- Network connectivity issues
+- Too many files in directory
+- Binary files included
+
+**Solutions:**
+
+<Tabs>
+<Tab title="Reduce Upload Size">
+```bash
+# Check current directory size
+du -sh .
+du -sh * | sort -hr
+
+# Add large files to .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore
+echo ".venv/" >> .gitignore
+echo "data/" >> .gitignore
+echo "*.model" >> .gitignore
+echo "*.pkl" >> .gitignore
+
+# Use specific upload directory
+```
+
+```python
+# Use smaller upload directory
+app = ChiselApp("my-app", upload_dir="./src")
+
+# Instead of uploading everything
+# app = ChiselApp("my-app", upload_dir=".")
+```
+</Tab>
+
+<Tab title="Optimize File Structure">
+```bash
+# Create optimized project structure
+mkdir -p chisel_project/{src,scripts}
+
+# Move only necessary files
+cp *.py chisel_project/src/
+cp requirements.txt chisel_project/
+
+# Run from optimized directory
+cd chisel_project
+chisel python src/my_script.py
+```
+</Tab>
+
+<Tab title="Network Troubleshooting">
+```bash
+# Test connectivity
+curl -v $CHISEL_BACKEND_URL/health
+
+# Check if upload endpoint works
+curl -v -X POST $CHISEL_BACKEND_URL/api/v1/upload-test
+
+# Test with different backend
+export CHISEL_BACKEND_URL="https://backup-api.herdora.com"
+chisel python my_script.py
+```
+</Tab>
+</Tabs>
+
+<Tip>
+Keep your upload directory under 50MB for fastest uploads and best reliability.
+</Tip>
+</Accordion>
+
+<Accordion title="Script Not Found in Archive" icon="file-x">
+**Symptoms:** `❌ Script not found in uploaded archive`
+
+**Causes:**
+- Script outside upload directory
+- Incorrect relative paths
+- Script name mismatch
+
+**Solutions:**
+
+<CodeGroup>
+```python Fix Upload Directory
+# Ensure script is in upload directory
+app = ChiselApp("my-app", upload_dir=".")
+
+# If script is in subdirectory
+app = ChiselApp("my-app", upload_dir="./scripts")
+
+# Check script location
+import os
+print(f"Current directory: {os.getcwd()}")
+print(f"Script exists: {os.path.exists('my_script.py')}")
+```
+
+```bash Verify File Structure
+# Check what's being uploaded
+ls -la
+
+# Check script path
+find . -name "*.py" -type f
+
+# Run from correct directory
+cd /path/to/project/root
+chisel python my_script.py
+```
+
+```bash Use Absolute Paths
+# Instead of
+chisel python ../scripts/my_script.py
+
+# Do this
+cd scripts
+chisel python my_script.py
+
+# Or set upload_dir correctly
+```
+</CodeGroup>
+</Accordion>
+
+<Accordion title="Argument Passing Issues" icon="terminal">
+**Symptoms:** `error: unrecognized arguments` or arguments not passed correctly
+
+**Solutions:**
+
+<CodeGroup>
+```bash Correct Argument Format
+# Correct format
+chisel python script.py --arg1 value1 --arg2 value2
+
+# With quotes for complex arguments
+chisel python script.py --text "hello world" --data '[1,2,3]'
+
+# Multiple arguments
+chisel python train.py --epochs 100 --lr 0.001 --batch-size 32
+```
+
+```bash Debug Arguments
+# Test argument parsing locally first
+python script.py --arg1 value1 --arg2 value2
+
+# Check what arguments are received
+python -c "import sys; print('Arguments:', sys.argv[1:])"
+
+# Debug in script
+import sys
+print(f"Received arguments: {sys.argv}")
+```
+
+```python Handle Arguments Robustly
+import argparse
+import sys
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--arg1', required=True)
+    parser.add_argument('--arg2', default='default_value')
+    
+    try:
+        args = parser.parse_args()
+        return args
+    except SystemExit as e:
+        print(f"Argument parsing failed: {e}")
+        print(f"Received args: {sys.argv}")
+        raise
+
+args = parse_args()
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+<AccordionGroup>
+<Accordion title="Slow GPU Execution" icon="clock">
+**Symptoms:** GPU execution slower than expected
+
+**Diagnostic Steps:**
+
+<Steps>
+<Step title="Verify GPU usage">
+```python
+import torch
+
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"Device count: {torch.cuda.device_count()}")
+print(f"Current device: {torch.cuda.current_device()}")
+print(f"Device name: {torch.cuda.get_device_name()}")
+
+# Check if tensors are on GPU
+tensor = torch.randn(100, device='cuda')
+print(f"Tensor device: {tensor.device}")
+```
+</Step>
+
+<Step title="Monitor GPU utilization">
+```python
+# Add to your script
+def print_gpu_utilization():
+    import torch
+    allocated = torch.cuda.memory_allocated() / 1024**3
+    reserved = torch.cuda.memory_reserved() / 1024**3
+    print(f"GPU Memory: {allocated:.1f}GB allocated, {reserved:.1f}GB reserved")
+
+# Call periodically during processing
+print_gpu_utilization()
+```
+</Step>
+
+<Step title="Optimize data placement">
+```python
+# Ensure data is on GPU
+data = data.cuda()
+model = model.cuda()
+
+# Use non_blocking transfer
+data = data.cuda(non_blocking=True)
+
+# Keep data on GPU between operations
+# Don't move back and forth unnecessarily
+```
+</Step>
+</Steps>
+
+**Performance Optimizations:**
+
+<CodeGroup>
+```python Mixed Precision
+from torch.cuda.amp import autocast, GradScaler
+
+scaler = GradScaler()
+
+for batch in dataloader:
+    with autocast():
+        output = model(batch)
+        loss = criterion(output, target)
+    
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+```
+
+```python Optimize Data Loading
+from torch.utils.data import DataLoader
+
+dataloader = DataLoader(
+    dataset,
+    batch_size=batch_size,
+    num_workers=4,          # Parallel loading
+    pin_memory=True,        # Faster GPU transfer
+    persistent_workers=True  # Keep workers alive
+)
+```
+
+```python Compile Models (PyTorch 2.0+)
+import torch
+
+# Compile for better performance
+model = torch.compile(model)
+
+# Use during training/inference
+output = model(input_data)
+```
+</CodeGroup>
+</Accordion>
+
+<Accordion title="Memory Leaks" icon="droplets">
+**Symptoms:** GPU memory usage increases over time
+
+**Detection and Solutions:**
+
+<CodeGroup>
+```python Monitor Memory Leaks
+import torch
+
+def track_memory(step_name):
+    allocated = torch.cuda.memory_allocated() / 1024**3
+    reserved = torch.cuda.memory_reserved() / 1024**3
+    print(f"{step_name}: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
+
+# Use throughout your code
+track_memory("Start")
+# ... your code ...
+track_memory("After processing")
+```
+
+```python Fix Common Leaks
+import torch
+import gc
+
+# Explicit cleanup
+def cleanup():
+    # Delete large variables
+    del large_tensor, model_output
+    
+    # Clear GPU cache
+    torch.cuda.empty_cache()
+    
+    # Force garbage collection
+    gc.collect()
+
+# Use context managers
+with torch.no_grad():
+    result = model(data)
+    # Memory automatically managed
+
+# Reset peak memory stats
+torch.cuda.reset_peak_memory_stats()
+```
+
+```python Prevent Gradient Accumulation
+# Wrong - accumulates gradients
+for epoch in range(epochs):
+    for batch in dataloader:
+        loss = model(batch)
+        loss.backward()  # Gradients accumulate
+
+# Correct - clear gradients
+for epoch in range(epochs):
+    for batch in dataloader:
+        optimizer.zero_grad()  # Clear gradients
+        loss = model(batch)
+        loss.backward()
+        optimizer.step()
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Network and Connectivity
+
+<AccordionGroup>
+<Accordion title="Connection Timeouts" icon="wifi">
+**Symptoms:** Network timeouts or connection errors
+
+**Diagnostic Steps:**
+
+<CodeGroup>
+```bash Test Backend Connectivity
+# Test basic connectivity
+ping your-backend-host
+
+# Test HTTP connectivity
+curl -v http://localhost:8000/health
+curl -v $CHISEL_BACKEND_URL/health
+
+# Test with timeout
+curl --connect-timeout 10 --max-time 30 $CHISEL_BACKEND_URL/health
+```
+
+```bash Network Configuration
+# Check proxy settings
+echo $HTTP_PROXY
+echo $HTTPS_PROXY
+
+# Test without proxy
+unset HTTP_PROXY HTTPS_PROXY
+chisel python my_script.py
+
+# Configure proxy if needed
+export HTTP_PROXY=http://proxy.company.com:8080
+export NO_PROXY=localhost,127.0.0.1
+```
+
+```python Alternative Backend
+import os
+
+# Try backup backend
+os.environ['CHISEL_BACKEND_URL'] = 'https://backup-api.herdora.com'
+
+# Or use different port
+os.environ['CHISEL_BACKEND_URL'] = 'http://localhost:8001'
+```
+</CodeGroup>
+</Accordion>
+
+<Accordion title="Streaming Connection Issues" icon="stream">
+**Symptoms:** Real-time output not showing or connection drops
+
+**Causes:**
+- Corporate firewall blocking streaming
+- Network instability
+- Backend overload
+
+**Solutions:**
+
+<CodeGroup>
+```bash Test Streaming
+# Check if streaming works
+curl -N $CHISEL_BACKEND_URL/api/v1/stream-test
+
+# Test with chisel
+chisel python -c "
+import time
+for i in range(10):
+    print(f'Output line {i}')
+    time.sleep(1)
+"
+```
+
+```bash Network Debugging
+# Check network stability
+ping -c 10 your-backend-host
+
+# Check for packet loss
+traceroute your-backend-host
+
+# Test different network
+# (try mobile hotspot, different WiFi)
+```
+
+```python Fallback Approach
+# For environments with streaming issues
+# Run job and check results later
+import time
+import requests
+
+# Submit job
+response = requests.post(f"{backend_url}/api/jobs", data=job_data)
+job_id = response.json()['job_id']
+
+# Poll for results
+while True:
+    status = requests.get(f"{backend_url}/api/jobs/{job_id}")
+    if status.json()['status'] == 'completed':
+        break
+    time.sleep(10)
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Debugging Tools
+
+<AccordionGroup>
+<Accordion title="Enable Debug Mode" icon="bug">
+**Enable comprehensive debugging for detailed error information:**
+
+<CodeGroup>
+```python Debug Logging
+import logging
+import os
+
+# Enable debug logging
+if os.getenv('CHISEL_DEBUG'):
+    logging.basicConfig(level=logging.DEBUG)
+    
+    # PyTorch debugging
+    import torch
+    torch.autograd.set_detect_anomaly(True)
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+```
+
+```bash Debug Environment
+# Set debug mode
+export CHISEL_DEBUG=1
+
+# Run with debug output
+chisel python my_script.py
+
+# Save debug output
+chisel python my_script.py 2>&1 | tee debug.log
+```
+
+```python Minimal Reproduction
+from chisel import ChiselApp, GPUType
+
+app = ChiselApp("debug-test", gpu=GPUType.A100_80GB_1)
+
+@app.capture_trace(trace_name="minimal_test")
+def minimal_test():
+    import torch
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    
+    if torch.cuda.is_available():
+        x = torch.tensor([1.0, 2.0], device='cuda')
+        result = x.sum()
+        print(f"GPU computation result: {result}")
+        return result.cpu().item()
+    else:
+        print("No CUDA available")
+        return 0
+
+if __name__ == "__main__":
+    result = minimal_test()
+    print(f"Final result: {result}")
+```
+</CodeGroup>
+</Accordion>
+
+<Accordion title="System Information Collection" icon="info">
+**Collect comprehensive system information for debugging:**
+
+<CodeGroup>
+```python System Info Script
+def collect_system_info():
+    import sys, torch, os, platform
+    
+    print("=== Chisel Debug Information ===")
+    print(f"Platform: {platform.platform()}")
+    print(f"Python: {sys.version}")
+    print(f"PyTorch: {torch.__version__}")
+    
+    # CUDA info
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"CUDA version: {torch.version.cuda}")
+        print(f"GPU count: {torch.cuda.device_count()}")
+        for i in range(torch.cuda.device_count()):
+            props = torch.cuda.get_device_properties(i)
+            print(f"GPU {i}: {props.name} ({props.total_memory/1e9:.1f}GB)")
+    
+    # Chisel environment
+    chisel_vars = {k: v for k, v in os.environ.items() if k.startswith('CHISEL')}
+    print(f"Chisel environment: {chisel_vars}")
+    
+    # Authentication status
+    try:
+        from chisel.auth import is_authenticated
+        print(f"Authenticated: {is_authenticated()}")
+    except Exception as e:
+        print(f"Auth check failed: {e}")
+
+# Run this to collect debug info
+collect_system_info()
+```
+
+```bash Quick Debug Collection
+# Create debug info file
+cat > debug_info.py << 'EOF'
+import sys, torch, os, platform
+from chisel.auth import is_authenticated
+
+print("=== Debug Info ===")
+print(f"Python: {sys.version}")
+print(f"PyTorch: {torch.__version__}")
+print(f"CUDA: {torch.cuda.is_available()}")
+print(f"Platform: {platform.platform()}")
+print(f"Authenticated: {is_authenticated()}")
+print(f"Chisel env: {dict((k,v) for k,v in os.environ.items() if k.startswith('CHISEL'))}")
+EOF
+
+# Run debug collection
+python debug_info.py
+```
+</CodeGroup>
+</Accordion>
+</AccordionGroup>
+
+## Common Error Patterns
+
+Quick reference for the most common error patterns and their solutions:
+
+| Error Message | Cause | Quick Fix |
+| --- | --- | --- |
+| `ModuleNotFoundError: No module named 'chisel'` | Not installed | `pip install chisel-cli` |
+| `CUDA out of memory` | Insufficient GPU memory | Reduce batch size or use larger GPU |
+| `Script not found` | Wrong upload directory | Check `upload_dir` parameter |
+| `Authentication failed` | Invalid credentials | `clear_credentials()` and re-authenticate |
+| `Connection timeout` | Network issues | Check connectivity and backend URL |
+| `Work upload failed` | Directory too large | Add files to `.gitignore` |
+
+## Getting Help
+
+<Warning>
+If you're still experiencing issues after trying these solutions, gather the following information before seeking help:
+</Warning>
+
+### Information to Collect
+
+1. **System Information** (use the debug script above)
+2. **Complete Error Output** (full traceback)
+3. **Minimal Reproduction Code** (smallest example that fails)
+4. **Job ID** (if applicable from Chisel output)
+5. **Network Environment** (corporate, home, cloud, etc.)
+
+### Support Channels
+
+<CardGroup cols={2}>
+  <Card title="Email Support" icon="envelope" href="mailto:contact@herdora.com">
+    Direct support for urgent issues and detailed troubleshooting
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/Herdora/chisel/issues">
+    Report bugs, request features, and community support
+  </Card>
+  
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/Herdora/chisel/discussions">
+    Ask questions, share ideas, and community help
+  </Card>
+  
+  <Card title="Documentation" icon="book-open" href="/api-reference/introduction">
+    Complete API reference and configuration guides
+  </Card>
+</CardGroup>
+
+### Reporting Template
+
+When reporting issues, use this template:
+
+```markdown
+## Issue Description
+Brief description of the problem
+
+## Environment
+- OS: [e.g., Ubuntu 22.04, macOS 13.0, Windows 11]
+- Python: [e.g., 3.9.7]
+- PyTorch: [e.g., 2.0.1]
+- Chisel CLI: [version or commit hash]
+
+## Steps to Reproduce
+1. Step one
+2. Step two
+3. Step three
+
+## Expected Behavior
+What you expected to happen
+
+## Actual Behavior
+What actually happened
+
+## Error Output
+```
+Complete error message and traceback
+```
+
+## Additional Context
+- Job ID (if applicable)
+- Network environment
+- Any workarounds tried
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Optimize settings and environment variables
+  </Card>
+  
+  <Card title="API Reference" icon="book-open" href="/api-reference/introduction">
+    Complete function and class documentation
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples">
+    Working examples and best practices
+  </Card>
+  
+  <Card title="Getting Started" icon="rocket" href="/quickstart">
+    Installation and setup guide
+  </Card>
+</CardGroup> 

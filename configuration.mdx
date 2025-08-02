@@ -1,0 +1,848 @@
+---
+title: "Configuration"
+description: "Configure Chisel CLI for optimal performance with GPU types, environment variables, and optimization settings"
+---
+
+Configure Chisel CLI for optimal performance across different workloads, from development to production-scale training.
+
+## GPU Configuration
+
+### GPU Type Selection
+
+Choose the right GPU configuration based on your specific requirements:
+
+<Tabs>
+<Tab title="By Use Case">
+<AccordionGroup>
+<Accordion title="Development & Prototyping" icon="flask">
+**Recommended: A100_80GB_1**
+
+Perfect for:
+- Code development and debugging
+- Algorithm prototyping  
+- Small dataset experimentation
+- Model inference testing
+
+```python
+dev_app = ChiselApp("development", gpu=GPUType.A100_80GB_1)
+
+@dev_app.capture_trace(trace_name="prototype")
+def prototype_function(data):
+    import torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Development code here
+    return result
+```
+</Accordion>
+
+<Accordion title="Training Small-Medium Models" icon="brain">
+**Recommended: A100_80GB_2**
+
+Optimal for:
+- Most PyTorch models
+- Computer vision tasks
+- NLP models up to ~7B parameters
+- Data parallel training
+
+```python
+train_app = ChiselApp("training", gpu=GPUType.A100_80GB_2)
+
+@train_app.capture_trace(trace_name="training")
+def train_model(data_loader, model):
+    import torch
+    from torch.nn.parallel import DataParallel
+    
+    if torch.cuda.device_count() > 1:
+        model = DataParallel(model)
+    
+    return model.cuda()
+```
+</Accordion>
+
+<Accordion title="Large Model Training" icon="rocket">
+**Recommended: A100_80GB_4 or A100_80GB_8**
+
+Required for:
+- Large language models (10B+ parameters)
+- High-resolution image models
+- Complex multi-modal architectures
+- Pipeline parallel training
+
+```python
+large_app = ChiselApp("large-training", gpu=GPUType.A100_80GB_8)
+
+@large_app.capture_trace(trace_name="large_model")
+def train_large_model(model, data_loader):
+    import torch
+    from torch.nn.parallel import DistributedDataParallel as DDP
+    
+    # Setup for distributed training
+    model = DDP(model)
+    return model
+```
+</Accordion>
+
+<Accordion title="High-Throughput Inference" icon="zap">
+**Recommended: A100_80GB_4**
+
+Best for:
+- Batch inference workloads
+- Real-time serving at scale
+- Multiple model deployment
+- Concurrent request handling
+
+```python
+inference_app = ChiselApp("inference", gpu=GPUType.A100_80GB_4)
+
+@inference_app.capture_trace(trace_name="batch_inference")
+def batch_inference(data_batches, models):
+    import torch
+    
+    results = []
+    for batch, model in zip(data_batches, models):
+        with torch.no_grad():
+            result = model(batch.cuda())
+            results.append(result.cpu())
+    
+    return results
+```
+</Accordion>
+</AccordionGroup>
+</Tab>
+
+<Tab title="By Memory Requirements">
+| Model Size | Parameters | Recommended GPU | Memory Reasoning |
+| --- | --- | --- | --- |
+| Small | < 1B | A100_80GB_1 | Fits comfortably in 80GB |
+| Medium | 1B - 7B | A100_80GB_2 | Benefits from parallel processing |
+| Large | 7B - 30B | A100_80GB_4 | Requires distributed memory |
+| Massive | 30B+ | A100_80GB_8 | Needs maximum memory capacity |
+
+**Memory Calculation:**
+```python
+def estimate_memory_requirement(model_params, precision="fp16"):
+    """Estimate memory requirements for training."""
+    bytes_per_param = 2 if precision == "fp16" else 4  # fp32
+    
+    # Model weights + gradients + optimizer state
+    model_memory = model_params * bytes_per_param
+    gradient_memory = model_params * bytes_per_param
+    optimizer_memory = model_params * bytes_per_param * 2  # Adam optimizer
+    
+    total_gb = (model_memory + gradient_memory + optimizer_memory) / (1024**3)
+    
+    # Add 20% overhead for activations and temporary variables
+    return total_gb * 1.2
+
+# Example usage
+llama_7b_memory = estimate_memory_requirement(7_000_000_000)
+print(f"Llama 7B estimated memory: {llama_7b_memory:.1f}GB")
+```
+</Tab>
+
+<Tab title="Cost Optimization">
+<Tip>
+Start with the smallest GPU that meets your requirements and scale up only when necessary.
+</Tip>
+
+**Cost-Performance Guidelines:**
+
+1. **Development**: Always use A100_80GB_1
+2. **Small Training**: A100_80GB_1 for datasets < 1M samples
+3. **Medium Training**: A100_80GB_2 for balanced cost/performance
+4. **Large Training**: A100_80GB_4 only when memory required
+5. **Massive Training**: A100_80GB_8 for 30B+ parameter models
+
+```python
+def cost_effective_gpu_selection(workload_type, data_size, model_params, time_constraint=False):
+    """Select GPU based on cost-effectiveness."""
+    
+    if workload_type == "development":
+        return GPUType.A100_80GB_1
+    
+    elif workload_type == "training":
+        if model_params < 1_000_000_000:  # < 1B params
+            return GPUType.A100_80GB_1
+        elif model_params < 7_000_000_000:  # < 7B params
+            return GPUType.A100_80GB_2
+        elif model_params < 30_000_000_000:  # < 30B params
+            return GPUType.A100_80GB_4
+        else:
+            return GPUType.A100_80GB_8
+    
+    elif workload_type == "inference":
+        # A100_80GB_2 provides good balance for most inference
+        return GPUType.A100_80GB_2
+    
+    else:
+        return GPUType.A100_80GB_1  # Safe default
+
+# Usage
+gpu_type = cost_effective_gpu_selection("training", 1000000, 7_000_000_000)
+app = ChiselApp("cost-optimized", gpu=gpu_type)
+```
+</Tab>
+</Tabs>
+
+## Application Configuration
+
+### ChiselApp Options
+
+Configure your ChiselApp for different scenarios:
+
+<CodeGroup>
+```python Basic Configuration
+from chisel import ChiselApp, GPUType
+
+app = ChiselApp(
+    name="my-app",              # Required: App identifier
+    upload_dir=".",             # Upload directory (default: current)
+    gpu=GPUType.A100_80GB_2     # GPU configuration
+)
+```
+
+```python Custom Upload Directory
+# Upload specific directory (recommended)
+app = ChiselApp("my-app", upload_dir="./src", gpu=GPUType.A100_80GB_1)
+
+# Upload parent directory (use with caution)
+app = ChiselApp("my-app", upload_dir="../", gpu=GPUType.A100_80GB_2)
+
+# Best practice: Keep upload size under 100MB
+import os
+
+def get_directory_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            total_size += os.path.getsize(filepath)
+    return total_size / (1024 * 1024)  # Convert to MB
+
+upload_size = get_directory_size("./src")
+print(f"Upload directory size: {upload_size:.1f}MB")
+```
+
+```python Multiple App Workflow
+# Different GPU configs for different tasks
+preprocessing_app = ChiselApp("preprocess", gpu=GPUType.A100_80GB_1)
+training_app = ChiselApp("train", gpu=GPUType.A100_80GB_4)
+evaluation_app = ChiselApp("evaluate", gpu=GPUType.A100_80GB_2)
+
+@preprocessing_app.capture_trace(trace_name="data_prep")
+def preprocess_data(raw_data):
+    # Light GPU work for data preprocessing
+    return processed_data
+
+@training_app.capture_trace(trace_name="model_training")
+def train_model(processed_data):
+    # Heavy GPU work requiring 4 GPUs
+    return trained_model
+
+@evaluation_app.capture_trace(trace_name="model_eval")
+def evaluate_model(model, test_data):
+    # Medium GPU work for evaluation
+    return metrics
+```
+</CodeGroup>
+
+### Trace Configuration
+
+Optimize tracing for debugging and performance monitoring:
+
+<Tabs>
+<Tab title="Basic Tracing">
+```python
+@app.capture_trace(trace_name="my_operation")
+def basic_function():
+    # Basic tracing - minimal overhead
+    pass
+```
+</Tab>
+
+<Tab title="Debug Tracing">
+```python
+@app.capture_trace(
+    trace_name="debug_operation",
+    record_shapes=True,
+    profile_memory=True
+)
+def debug_function():
+    # Enhanced debugging with shape and memory profiling
+    # Higher overhead but detailed information
+    pass
+```
+</Tab>
+
+<Tab title="Production Tracing">
+```python
+import os
+
+# Enable detailed tracing only in development
+debug_mode = os.getenv('CHISEL_DEBUG', '0') == '1'
+
+@app.capture_trace(
+    trace_name="production_operation",
+    record_shapes=debug_mode,
+    profile_memory=debug_mode
+)
+def production_function():
+    # Conditional detailed tracing
+    pass
+```
+</Tab>
+</Tabs>
+
+## Environment Variables
+
+### Core Environment Variables
+
+<AccordionGroup>
+<Accordion title="CHISEL_ACTIVATED" icon="power">
+**Purpose**: Activates GPU functionality  
+**Set by**: `chisel` command  
+**Values**: "1" (active) or unset (inactive)
+
+```python
+import os
+
+if os.environ.get("CHISEL_ACTIVATED") == "1":
+    print("🚀 Chisel is activated - using cloud GPU")
+else:
+    print("💻 Running locally")
+```
+</Accordion>
+
+<Accordion title="CHISEL_BACKEND_URL" icon="server">
+**Purpose**: Override backend URL  
+**Set by**: User (optional)  
+**Default**: "http://localhost:8000"
+
+```bash
+# Use production backend
+export CHISEL_BACKEND_URL="https://api.herdora.com"
+chisel python my_script.py
+
+# Use staging backend
+export CHISEL_BACKEND_URL="https://staging-api.herdora.com"
+chisel python my_script.py
+```
+</Accordion>
+
+<Accordion title="CHISEL_API_KEY" icon="key">
+**Purpose**: Direct API key provision  
+**Set by**: User or CI/CD system  
+**Usage**: Bypasses stored credentials
+
+```bash
+# CI/CD usage
+export CHISEL_API_KEY="your_api_key_here"
+chisel python my_script.py
+
+# Or in Python
+import os
+os.environ["CHISEL_API_KEY"] = "your_api_key_here"
+```
+</Accordion>
+
+<Accordion title="CHISEL_BACKEND_RUN" icon="cloud">
+**Purpose**: Indicates backend execution  
+**Set by**: Backend system  
+**Values**: "1" when running on cloud GPU
+
+```python
+import os
+
+def is_running_on_cloud():
+    return os.environ.get("CHISEL_BACKEND_RUN") == "1"
+
+if is_running_on_cloud():
+    job_id = os.environ.get("CHISEL_JOB_ID", "unknown")
+    print(f"Running on cloud GPU (Job: {job_id})")
+```
+</Accordion>
+</AccordionGroup>
+
+### Environment Configuration Files
+
+<Tabs>
+<Tab title=".env File">
+```bash
+# .env file for project configuration
+CHISEL_BACKEND_URL=https://api.herdora.com
+TORCH_CUDA_ARCH_LIST=8.0
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+CUDA_VISIBLE_DEVICES=0,1,2,3
+```
+
+Load in Python:
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+app = ChiselApp("configured-app")
+```
+</Tab>
+
+<Tab title="Shell Configuration">
+```bash
+# ~/.bashrc or ~/.zshrc
+export CHISEL_BACKEND_URL="https://api.herdora.com"
+export CHISEL_DEBUG="0"  # Set to "1" for debug mode
+
+# Project-specific configuration
+alias chisel-dev="CHISEL_BACKEND_URL=http://localhost:8000 chisel"
+alias chisel-prod="CHISEL_BACKEND_URL=https://api.herdora.com chisel"
+```
+</Tab>
+
+<Tab title="Docker Configuration">
+```dockerfile
+# Dockerfile
+FROM python:3.9
+
+# Set Chisel environment variables
+ENV CHISEL_BACKEND_URL=https://api.herdora.com
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+
+# Install Chisel CLI
+RUN pip install chisel-cli
+
+COPY . /app
+WORKDIR /app
+
+CMD ["chisel", "python", "main.py"]
+```
+</Tab>
+</Tabs>
+
+## Performance Optimization
+
+### Memory Management
+
+<AccordionGroup>
+<Accordion title="GPU Memory Optimization" icon="memory">
+Optimize GPU memory usage for better performance:
+
+```python
+import torch
+import gc
+
+@app.capture_trace(trace_name="memory_optimized", profile_memory=True)
+def memory_efficient_processing(large_dataset):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # Clear cache at start
+    torch.cuda.empty_cache()
+    
+    # Process in chunks to manage memory
+    batch_size = 1000  # Adjust based on available memory
+    results = []
+    
+    for i in range(0, len(large_dataset), batch_size):
+        batch = large_dataset[i:i+batch_size]
+        batch_tensor = torch.tensor(batch, device=device)
+        
+        # Process batch
+        with torch.cuda.amp.autocast():  # Use mixed precision
+            batch_result = process_batch(batch_tensor)
+        
+        # Move result to CPU immediately to free GPU memory
+        results.append(batch_result.cpu())
+        
+        # Clean up GPU memory
+        del batch_tensor, batch_result
+        
+        # Periodic memory cleanup
+        if i % (batch_size * 10) == 0:
+            torch.cuda.empty_cache()
+            gc.collect()
+    
+    return torch.cat(results)
+```
+</Accordion>
+
+<Accordion title="Multi-GPU Configuration" icon="microchip">
+Configure multiple GPUs for maximum throughput:
+
+```python
+import torch
+from torch.nn.parallel import DataParallel, DistributedDataParallel
+
+@app.capture_trace(trace_name="multi_gpu_setup")
+def setup_multi_gpu_model(model):
+    device_count = torch.cuda.device_count()
+    
+    if device_count == 0:
+        print("❌ No GPU available")
+        return model
+    
+    elif device_count == 1:
+        print("🎯 Using single GPU")
+        return model.cuda()
+    
+    else:
+        print(f"🚀 Using {device_count} GPUs with DataParallel")
+        model = DataParallel(model)
+        return model.cuda()
+
+# For distributed training (advanced)
+@app.capture_trace(trace_name="distributed_setup")
+def setup_distributed_training():
+    import torch.distributed as dist
+    
+    # Initialize distributed training
+    dist.init_process_group(backend='nccl')
+    
+    # Get local rank and world size
+    local_rank = int(os.environ.get('LOCAL_RANK', 0))
+    world_size = int(os.environ.get('WORLD_SIZE', 1))
+    
+    torch.cuda.set_device(local_rank)
+    
+    return local_rank, world_size
+```
+</Accordion>
+
+<Accordion title="Mixed Precision Training" icon="zap">
+Use mixed precision for faster training with less memory:
+
+```python
+from torch.cuda.amp import autocast, GradScaler
+
+@app.capture_trace(trace_name="mixed_precision_training")
+def train_with_mixed_precision(model, data_loader, optimizer, criterion):
+    scaler = GradScaler()
+    model.train()
+    
+    for batch_idx, (inputs, targets) in enumerate(data_loader):
+        inputs, targets = inputs.cuda(), targets.cuda()
+        
+        optimizer.zero_grad()
+        
+        # Forward pass with autocast
+        with autocast():
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+        
+        # Backward pass with gradient scaling
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        
+        if batch_idx % 100 == 0:
+            print(f'Batch {batch_idx}, Loss: {loss.item():.4f}')
+    
+    return model
+```
+</Accordion>
+
+<Accordion title="Batch Size Optimization" icon="chart-line">
+Find optimal batch size for your GPU memory:
+
+```python
+def find_optimal_batch_size(model, sample_input, max_memory_gb=80):
+    """Find the largest batch size that fits in GPU memory."""
+    model = model.cuda()
+    batch_size = 32
+    
+    while batch_size <= 2048:
+        try:
+            # Create batch of given size
+            batch_input = sample_input.repeat(batch_size, 1, 1, 1).cuda()
+            
+            # Forward pass
+            with torch.no_grad():
+                output = model(batch_input)
+            
+            # Check memory usage
+            memory_used = torch.cuda.max_memory_allocated() / (1024**3)
+            print(f"Batch size {batch_size}: {memory_used:.2f}GB")
+            
+            # Stop if we're using more than 90% of available memory
+            if memory_used > max_memory_gb * 0.9:
+                optimal_batch_size = batch_size // 2
+                print(f"Optimal batch size: {optimal_batch_size}")
+                return optimal_batch_size
+            
+            batch_size *= 2
+            
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                optimal_batch_size = batch_size // 2
+                print(f"Optimal batch size: {optimal_batch_size}")
+                return optimal_batch_size
+            else:
+                raise e
+    
+    return batch_size
+
+# Usage
+optimal_batch = find_optimal_batch_size(my_model, sample_input)
+```
+</Accordion>
+</AccordionGroup>
+
+### PyTorch Optimization
+
+<CodeGroup>
+```python A100 Specific Optimizations
+import torch
+import os
+
+# A100 architecture optimization
+os.environ['TORCH_CUDA_ARCH_LIST'] = '8.0'
+
+# Memory management
+torch.cuda.set_per_process_memory_fraction(0.9)
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+
+# Enable optimized attention (PyTorch 2.0+)
+torch.backends.cuda.enable_flash_sdp(True)
+torch.backends.cuda.enable_mem_efficient_sdp(True)
+```
+
+```python Compilation Optimization
+import torch
+
+# Compile models for better performance (PyTorch 2.0+)
+@app.capture_trace(trace_name="compiled_training")
+def train_compiled_model(model, data_loader):
+    # Compile model for faster execution
+    compiled_model = torch.compile(model)
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    compiled_model = compiled_model.to(device)
+    
+    # Training loop with compiled model
+    for batch in data_loader:
+        output = compiled_model(batch.to(device))
+        # ... training logic
+    
+    return compiled_model
+```
+
+```python Data Loading Optimization
+import torch
+from torch.utils.data import DataLoader
+
+# Optimize data loading
+def create_optimized_dataloader(dataset, batch_size):
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,  # Adjust based on CPU cores
+        pin_memory=True,  # Faster GPU transfer
+        persistent_workers=True,  # Keep workers alive
+        prefetch_factor=2  # Prefetch batches
+    )
+```
+</CodeGroup>
+
+## Development Configuration
+
+### Local Development Setup
+
+<Tabs>
+<Tab title="Development Mode">
+```python
+import os
+
+# Development configuration
+def setup_development_environment():
+    """Configure Chisel for development."""
+    
+    # Disable Chisel for local development
+    if os.getenv('DEVELOPMENT'):
+        print("💻 Development mode - Chisel inactive")
+        return False
+    
+    # Enable debug mode
+    if os.getenv('CHISEL_DEBUG'):
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+        torch.autograd.set_detect_anomaly(True)
+        os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+    
+    return True
+
+# Usage
+if setup_development_environment():
+    app = ChiselApp("dev-app")
+else:
+    # Create no-op app for local development
+    class NoOpApp:
+        def capture_trace(self, **kwargs):
+            return lambda func: func
+    
+    app = NoOpApp()
+```
+</Tab>
+
+<Tab title="Testing Configuration">
+```python
+def create_test_app(test_mode="local"):
+    """Create ChiselApp configured for testing."""
+    
+    if test_mode == "local":
+        # Force local execution for tests
+        os.environ.pop('CHISEL_ACTIVATED', None)
+        return None  # Use local execution
+    
+    elif test_mode == "gpu":
+        # Use smallest GPU for testing
+        return ChiselApp("test-app", gpu=GPUType.A100_80GB_1)
+    
+    elif test_mode == "mock":
+        # Mock ChiselApp for unit tests
+        class MockChiselApp:
+            def __init__(self, name, gpu=None):
+                self.name = name
+                self.gpu = gpu
+            
+            def capture_trace(self, **kwargs):
+                return lambda func: func
+        
+        return MockChiselApp("mock-app")
+
+# Usage in tests
+def test_gpu_function():
+    app = create_test_app("local")  # Test locally first
+    
+    if app:
+        @app.capture_trace(trace_name="test")
+        def test_function():
+            return 42
+    else:
+        def test_function():
+            return 42
+    
+    result = test_function()
+    assert result == 42
+```
+</Tab>
+
+<Tab title="CI/CD Configuration">
+```yaml
+# GitHub Actions configuration
+name: Chisel CI/CD
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        pip install chisel-cli
+        pip install -r requirements.txt
+    
+    - name: Run local tests
+      run: pytest tests/ -v
+    
+    - name: Run GPU tests
+      env:
+        CHISEL_API_KEY: ${{ secrets.CHISEL_API_KEY }}
+      run: chisel python -m pytest tests/gpu_tests.py -v
+```
+</Tab>
+</Tabs>
+
+## Best Practices
+
+<Tip>
+Follow these configuration best practices for optimal Chisel CLI usage:
+</Tip>
+
+### Configuration Checklist
+
+1. **GPU Selection**
+   - Start with A100_80GB_1 for development
+   - Scale up based on actual memory requirements
+   - Monitor GPU utilization to ensure efficient usage
+
+2. **Upload Optimization**
+   - Keep upload directories under 100MB
+   - Use `.gitignore` to exclude unnecessary files
+   - Include only required code and dependencies
+
+3. **Memory Management**
+   - Use mixed precision training when possible
+   - Process large datasets in chunks
+   - Clear GPU memory explicitly when needed
+
+4. **Environment Variables**
+   - Use `.env` files for project-specific configuration
+   - Set `CHISEL_DEBUG=1` for development debugging
+   - Configure backend URLs appropriately for each environment
+
+5. **Performance Monitoring**
+   - Use `profile_memory=True` for optimization
+   - Monitor job costs and GPU utilization
+   - Benchmark different configurations for your workload
+
+```python
+# Configuration validation script
+def validate_chisel_configuration():
+    """Validate Chisel CLI configuration."""
+    
+    issues = []
+    
+    # Check upload directory size
+    upload_dir = "."
+    size_mb = get_directory_size(upload_dir)
+    if size_mb > 100:
+        issues.append(f"Upload directory too large: {size_mb:.1f}MB > 100MB")
+    
+    # Check GPU memory requirements
+    estimated_memory = estimate_memory_requirement(model_params)
+    gpu_memory = get_gpu_memory(gpu_type)
+    if estimated_memory > gpu_memory * 0.8:
+        issues.append(f"Insufficient GPU memory: {estimated_memory:.1f}GB > {gpu_memory:.1f}GB")
+    
+    # Check authentication
+    from chisel.auth import is_authenticated
+    if not is_authenticated():
+        issues.append("Authentication required")
+    
+    if issues:
+        print("❌ Configuration issues found:")
+        for issue in issues:
+            print(f"   - {issue}")
+        return False
+    else:
+        print("✅ Configuration validated successfully")
+        return True
+
+# Run validation
+validate_chisel_configuration()
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book-open" href="/api-reference/introduction">
+    Complete API documentation for ChiselApp and GPU types
+  </Card>
+  
+  <Card title="Examples" icon="code" href="/examples">
+    Working examples with different configurations
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Configuration troubleshooting and optimization tips
+  </Card>
+  
+  <Card title="Performance Guide" icon="chart-line" href="/performance">
+    Advanced performance optimization techniques
+  </Card>
+</CardGroup> 
