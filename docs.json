@@ -8,7 +8,7 @@
     "dark": "#111827"
   },
   "font": "IBM Plex Sans",
-  "favicon": "/favicon.svg",
+  "favicon": "/tab_title.png",
   "navigation": {
     "tabs": [
       {
